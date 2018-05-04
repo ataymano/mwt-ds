@@ -40,7 +40,7 @@ def create_stats(log_files, dashboard_file, predictions_files=None):
     log_fps = ds_parse.input_files_to_fp_list(log_files)
 
     if predictions_files is None:
-        print('Reading prediction files for log file: {}'.format(log_fps[0]))
+        print('Searching prediction files for log file: {}'.format(log_fps[0]))
         predictions_files = []
         for fn in os.scandir(os.path.dirname(log_fps[0])):
             if fn.path.startswith(log_fps[0]+'.') and fn.name.endswith('.pred'):
@@ -65,10 +65,24 @@ def create_stats(log_files, dashboard_file, predictions_files=None):
         sys.exit()
 
     d = {}
-    i = 0
     for log_file in log_fps:
         print('Processing: {}'.format(log_file))
+        bytes_count = 0
+        tot_bytes = os.path.getsize(log_file)
+        i = 0
         for x in (gzip.open(log_file, 'rb') if log_file.endswith('.gz') else open(log_file, 'rb')):
+            # display progress
+            bytes_count += len(x)
+            i += 1
+            if i % 5000 == 0:
+                if log_file.endswith('.gz'):
+                    if i % 20000 == 0:
+                        print('.', end='', flush=True)
+                        if i % 1000000 == 0:
+                            print(' - Iter:',i)
+                else:
+                    ds_parse.update_progress(bytes_count,tot_bytes)
+
             if x.startswith(b'{"_label_cost":'):
                 ei,cost,ts,log_prob,a,num_a = ds_parse.json_cooked(x)
                 r = 0 if cost == b'0' else -float(cost)
@@ -111,15 +125,11 @@ def create_stats(log_files, dashboard_file, predictions_files=None):
                         if r != 0:
                             d[ts_bin][name]['n'] += r*p_over_p
                             d[ts_bin][name]['c'] = max(d[ts_bin][name]['c'], r*p_over_p)
+        len_text = ds_parse.update_progress(bytes_count,tot_bytes)
+        sys.stdout.write("\r" + " "*len_text + "\r")
+        sys.stdout.flush()
 
-                # display progress
-                i += 1
-                if i % 20000 == 0:
-                    print('.', end='', flush=True)
-                    if i % 1000000 == 0:
-                        print(' - Iter:',i)
-
-    print('\nProcessed {} events'.format(i))
+    print('Processed {} events'.format(i))
     if any(len(pred[name]) != i for name in pred):
         print('Error: Prediction file length ({}) is different from number of events in log file ({})'.format([len(pred[name]) for name in pred],i))
         sys.exit()
@@ -149,7 +159,7 @@ def create_stats(log_files, dashboard_file, predictions_files=None):
                     d.append(temp)
                 f.write(json.dumps({"ts":index.strftime("%Y-%m-%dT%H:%M:%SZ"),"d":d})+'\n')
     
-    print('Total Elapsed Time:',time.time()-t0)
+    print('Total Elapsed Time: {:.1f} sec.'.format(time.time()-t0))
 
 
 if __name__ == '__main__':
