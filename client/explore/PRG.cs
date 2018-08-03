@@ -69,9 +69,7 @@ namespace Microsoft.Research.MultiWorldTesting.ExploreLibrary
         /// <returns>The random number as an unsigned integer.</returns>
         public uint UniformInt(uint low, uint high)
         {
-            Merand48(ref V);
-            uint ret = low + (uint)((V >> 25) % (high - low + 1));
-            return ret;
+            return low + (uint)(Merand48(ref V) * (high - low + 1));
         }
     
         public int UniformInt(int low, int high)
