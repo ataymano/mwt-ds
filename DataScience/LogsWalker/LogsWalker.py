@@ -129,7 +129,7 @@ class AzureDsJsonTimestampIndex:
 
     def __get_offset_info___(self, offset, chunk_size=1024 ** 2):
         view = DsJsonDayView(
-            AzureStorageBlobView(self.__Asb__, self.__TmpFolder__, offset, offset + chunk_size, temporary=True))
+            AzureStorageBlobView(self.__Asb__, self.__TmpFolder__, offset, offset + chunk_size))
         return view.Impl.get_server_offset(), view.get_timestamp()
 
     def lookup(self, timestamp, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
@@ -164,7 +164,7 @@ class DsJsonDayView:
 
     def ccb_events(self):
         events = map(lambda l: DsJson.ccb_2_cb(*DsJson.get_ccb_event(l)),
-                filter(lambda l: DsJson.is_ccb_event(l), self.Impl.read()))
+                     filter(lambda l: DsJson.is_ccb_event(l), self.Impl.read()))
         df = pd.DataFrame(itertools.chain(*events))
         return df.set_index('Timestamp')
 
@@ -186,18 +186,32 @@ class DsJsonDayClient:
 
         self.__Asb__ = AzureStorageBlob(bbs, app, azure_path)
         self.Folder = local_folder
-        self.Index = AzureDsJsonTimestampIndex(self.__Asb__, os.path.join(self.Folder, 'index'))
         os.makedirs(self.Folder, exist_ok=True)
 
-    def get_view(self, start_offset, end_offset):
-        return DsJsonDayView(AzureStorageBlobView(self.__Asb__, self.Folder, start_offset, end_offset))
+        self.__TmpFolder__ = os.path.join(self.Folder, 'tmp')
+        os.makedirs(self.__TmpFolder__, exist_ok=True)
+
+        self.__Index__ = AzureDsJsonTimestampIndex(self.__Asb__, self.Folder)
+
+    def get_view(self, start_offset, size=8 * 1024 ** 2):
+        return DsJsonDayView(AzureStorageBlobView(self.__Asb__, self.Folder, start_offset, start_offset + size))
 
     def get_size(self):
         return self.__Asb__.get_size()
 
-    def create_datetime(self, hours, minutes):
+    def lookup(self, hours, minutes, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
+               iterations_limit=10):
         import pytz
-        return datetime.datetime(self.Year, self.Month, self.Day, hours, minutes, 0, tzinfo=pytz.utc)
+        dt = datetime.datetime(self.Year, self.Month, self.Day, hours, minutes, 0, tzinfo=pytz.utc)
+        return self.__Index__.lookup(dt, tolerance, offset_limit, iterations_limit)
+
+    def overview(self):
+        size = self.get_size()
+        _, first_ts = self.__Index__.__get_offset_info___(0)
+        _, last_ts = self.__Index__.__get_offset_info___(size - 1024 ** 2, 1024 ** 2 - 1)
+        return pd.DataFrame([{'Size': '{:.2f} GB'.format(size / (1024 ** 3)),
+                              'FirstTimestamp': first_ts,
+                              'LastTimestamp': last_ts}])
 
 
 class AppContext:
