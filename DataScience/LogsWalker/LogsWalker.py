@@ -5,6 +5,7 @@ import shutil
 import datetime
 import pandas as pd
 import itertools
+import json
 
 
 class FileHelpers:
@@ -125,22 +126,48 @@ class AzureDsJsonTimestampIndex:
         self.__Asb__ = azure_storage_blob
         self.__Folder__ = folder
         self.__TmpFolder__ = os.path.join(self.__Folder__, 'tmp')
+        self.__IndexPath__ = os.path.join(self.__Folder__, 'index')
         os.makedirs(self.__TmpFolder__, exist_ok=True)
 
     def __get_offset_info___(self, offset, chunk_size=1024 ** 2):
         view = DsJsonDayView(
-            AzureStorageBlobView(self.__Asb__, self.__TmpFolder__, offset, offset + chunk_size))
+            AzureStorageBlobView(self.__Asb__, self.__TmpFolder__, offset, offset + chunk_size, temporary=True))
         return view.Impl.get_server_offset(), view.get_timestamp()
+
+    def __get_index__(self):
+        if os.path.exists(self.__IndexPath__):
+            with open(self.__IndexPath__, 'r') as f: 
+                return dict(json.load(f))
+        return {}
+
+    def __update_index__(self, index):
+        with open(self.__IndexPath__, 'w') as f:
+            json.dump(list(index.items()), f)
+
+    @staticmethod
+    def __init_lookup_range__(dt, index):
+        import bisect
+        ts = dt.timestamp()
+        keys = list(index.keys()) if len(index) > 0 else []
+        keys.sort()
+        pos = bisect.bisect_left(keys, ts)
+        last = index[keys[pos]] if pos < len(keys) else None
+        first = index[keys[pos - 1]] if pos > 0 else 0
+        return first, last
 
     def lookup(self, timestamp, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
                iterations_limit=10):
-        _min, _max = (0, self.__Asb__.get_size())
+        index = self.__get_index__()
+        _min, _max = AzureDsJsonTimestampIndex.__init_lookup_range__(timestamp, index)
+        if not _max:
+            _max = self.__Asb__.get_size()
+
         i = 0
         candidate_offset = 0
         while _max - _min > offset_limit:
             candidate = int(round((_min + _max) / 2))
             candidate_offset, candidate_ts = self.__get_offset_info___(candidate)
-
+            index[candidate_ts.timestamp()] = candidate_offset
             delta = (candidate_ts - timestamp) if candidate_ts >= timestamp else (timestamp - candidate_ts)
             if delta < tolerance or i >= iterations_limit:
                 break
@@ -149,6 +176,7 @@ class AzureDsJsonTimestampIndex:
             else:
                 _min = candidate_offset
             i += 1
+        self.__update_index__(index)
         return candidate_offset
 
 
