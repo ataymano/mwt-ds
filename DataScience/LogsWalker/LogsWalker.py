@@ -3,6 +3,8 @@ from LogsParser import DsJson
 import os.path
 import shutil
 import datetime
+import pandas as pd
+import itertools
 
 
 class FileHelpers:
@@ -81,12 +83,12 @@ class AzureStorageBlobView:
 
     def __get_previous__(self):
         if os.path.exists(self.__PreviousPath__):
-            with open(self.__PreviousPath__, 'r') as f:
+            with open(self.__PreviousPath__, 'r', encoding='utf-8') as f:
                 return f.read()
         return None
 
     def set_previous(self, previous):
-        with open(self.__PreviousPath__, 'w') as f:
+        with open(self.__PreviousPath__, 'w', encoding='utf-8') as f:
             f.write(previous)
 
     def get_server_offset(self, aligned=True):
@@ -99,7 +101,7 @@ class AzureStorageBlobView:
 
     def read(self):
         current = self.__get_previous__()
-        with open(self.Path, 'r') as f:
+        with open(self.Path, 'r', encoding='utf-8') as f:
             first = f.readline()
             if current is not None:
                 current = current + first
@@ -117,10 +119,6 @@ class AzureStorageBlobView:
                 f2.truncate(os.path.getsize(self.Path) + self.__LastEof__ - self.__FirstEof__)
         return aligned_path
 
-    def get_timestamp(self):
-        line = next(self.read())
-        return DsJson.get_timestamp(line)
-
 
 class AzureDsJsonTimestampIndex:
     def __init__(self, azure_storage_blob, folder):
@@ -130,10 +128,12 @@ class AzureDsJsonTimestampIndex:
         os.makedirs(self.__TmpFolder__, exist_ok=True)
 
     def __get_offset_info___(self, offset, chunk_size=1024 ** 2):
-        view = AzureStorageBlobView(self.__Asb__, self.__TmpFolder__, offset, offset + chunk_size, temporary=True)
-        return view.get_server_offset(), view.get_timestamp()
+        view = DsJsonDayView(
+            AzureStorageBlobView(self.__Asb__, self.__TmpFolder__, offset, offset + chunk_size, temporary=True))
+        return view.Impl.get_server_offset(), view.get_timestamp()
 
-    def lookup(self, timestamp, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2, iterations_limit=10):
+    def lookup(self, timestamp, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
+               iterations_limit=10):
         _min, _max = (0, self.__Asb__.get_size())
         i = 0
         candidate_offset = 0
@@ -152,6 +152,30 @@ class AzureDsJsonTimestampIndex:
         return candidate_offset
 
 
+class DsJsonDayView:
+    def __init__(self, azure_storage_blob_view):
+        self.Impl = azure_storage_blob_view
+
+    def dangling_rewards(self):
+        df = pd.DataFrame(
+            map(lambda l: DsJson.get_dangling_reward(l),
+                filter(lambda l: DsJson.is_dangling_reward(l), self.Impl.read())))
+        return df.set_index('Timestamp')
+
+    def ccb_events(self):
+        events = map(lambda l: DsJson.ccb_2_cb(*DsJson.get_ccb_event(l)),
+                filter(lambda l: DsJson.is_ccb_event(l), self.Impl.read()))
+        df = pd.DataFrame(itertools.chain(*events))
+        return df.set_index('Timestamp')
+
+    def read(self):
+        return self.Impl.read()
+
+    def get_timestamp(self):
+        line = next(self.read())
+        return DsJson.get_timestamp(line)
+
+
 class DsJsonDayClient:
     def __init__(self, bbs, app, folder, year, month, day, local_folder):
         self.Year = year
@@ -166,7 +190,7 @@ class DsJsonDayClient:
         os.makedirs(self.Folder, exist_ok=True)
 
     def get_view(self, start_offset, end_offset):
-        return AzureStorageBlobView(self.__Asb__, self.Folder, start_offset, end_offset)
+        return DsJsonDayView(AzureStorageBlobView(self.__Asb__, self.Folder, start_offset, end_offset))
 
     def get_size(self):
         return self.__Asb__.get_size()
