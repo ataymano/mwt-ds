@@ -147,37 +147,41 @@ class AzureDsJsonTimestampIndex:
     @staticmethod
     def __init_lookup_range__(dt, index):
         import bisect
+        import pytz
         ts = dt.timestamp()
         keys = list(index.keys()) if len(index) > 0 else []
         keys.sort()
         pos = bisect.bisect_left(keys, ts)
         last = index[keys[pos]] if pos < len(keys) else None
         first = index[keys[pos - 1]] if pos > 0 else 0
-        return first, last
+        first_dt = date = datetime.datetime.fromtimestamp(ts, tz=pytz.utc) if pos > 0 else None
+        return first, last, first_dt
 
     def lookup(self, timestamp, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
                iterations_limit=10):
         index = self.__get_index__()
-        _min, _max = AzureDsJsonTimestampIndex.__init_lookup_range__(timestamp, index)
+        _min, _max, _min_dt = AzureDsJsonTimestampIndex.__init_lookup_range__(timestamp, index)
+        if _min_dt and timestamp - _min_dt < tolerance:
+            return _min
+        
         if not _max:
             _max = self.__Asb__.get_size()
 
         i = 0
-        candidate_offset = 0
         while _max - _min > offset_limit:
             candidate = int(round((_min + _max) / 2))
             candidate_offset, candidate_ts = self.__get_offset_info___(candidate)
             index[candidate_ts.timestamp()] = candidate_offset
-            delta = (candidate_ts - timestamp) if candidate_ts >= timestamp else (timestamp - candidate_ts)
-            if delta < tolerance or i >= iterations_limit:
-                break
-            if candidate_ts >= timestamp:
+            if candidate_ts > timestamp:
                 _max = candidate_offset
             else:
                 _min = candidate_offset
+                delta = timestamp - candidate_ts
+                if delta < tolerance or i >= iterations_limit:
+                    break
             i += 1
         self.__update_index__(index)
-        return candidate_offset
+        return _min
 
 
 class DsJsonDayView:
