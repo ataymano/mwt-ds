@@ -213,6 +213,7 @@ class DsJsonDayClient:
         self.Year = year
         self.Month = month
         self.Day = day
+        self.App = app
 
         azure_path = '{0}/data/{1}/{2}/{3}_0.json'.format(folder, year, str(month).zfill(2), str(day).zfill(2))
 
@@ -239,21 +240,32 @@ class DsJsonDayClient:
 
     def overview(self):
         size = self.get_size()
-        _, first_ts = self.__Index__.__get_offset_info___(0)
         _, last_ts = self.__Index__.__get_offset_info___(size - 1024 ** 2, 1024 ** 2 - 1)
-        return pd.DataFrame([{'Size': '{:.2f} GB'.format(size / (1024 ** 3)),
-                              'FirstTimestamp': first_ts,
+        return pd.DataFrame([{'App': self.App,
+                              'Day': '{0}-{1}-{2}'.format(self.Year, self.Month, self.Day),
+                              'Size': '{:.2f} GB'.format(size / (1024 ** 3)),
                               'LastTimestamp': last_ts}])
 
 
 class AppContext:
-    def __init__(self, bbs, app, folder, workspace_folder):
+    def __init__(self, workspace_folder, bbs, app, folder = None):
         self.Bbs = bbs
         self.App = app
-        self.Folder = folder
-        self.AppFolder = os.path.join(workspace_folder, app, folder)
+        if folder:
+            self.Folder = folder
+        else:
+            self.Folder = self.__get_latest_folder__(self.Bbs, self.App)
+            print('Latest folder was resolved as: {0}'.format(self.Folder))
+
+        self.AppFolder = os.path.join(workspace_folder, app, self.Folder)
         os.makedirs(self.AppFolder, exist_ok=True)
 
     def get_day(self, year, month, day):
         day_folder = os.path.join(self.AppFolder, '{0}-{1}-{2}'.format(year, str(month).zfill(2), str(day).zfill(2)))
         return DsJsonDayClient(self.Bbs, self.App, self.Folder, year, month, day, day_folder)
+
+    @staticmethod
+    def __get_latest_folder__(bbs, container):
+        folders = bbs.list_blobs(container, delimiter='/')
+        folder = max([d.name[:-1] for d in filter(lambda d: d.name[-1] == '/', folders)])
+        return folder
