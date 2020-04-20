@@ -278,3 +278,14 @@ class AppContext:
 
     def get_stats(self):
         return StatsContext(os.path.join(self.Folder, 'stats'), self.AdlsClient, self.App)
+
+class Workspace:
+    def __init__(self, folder, bbs = None, adls = None):
+        self.Bbs = bbs
+        self.Adls = adls
+        self.Folder = folder
+
+    def get_app(self, app, folder = None):
+        return AppContext(self.Folder, self.Bbs, app, folder, self.Adls)
+
+    
