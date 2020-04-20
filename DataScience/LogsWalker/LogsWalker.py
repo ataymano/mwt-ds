@@ -1,4 +1,5 @@
 from LogsParser import DsJson
+from Statistics import StatsContext, Statistics
 
 import os.path
 import shutil
@@ -248,7 +249,7 @@ class DsJsonDayClient:
 
 
 class AppContext:
-    def __init__(self, workspace_folder, bbs, app, folder = None):
+    def __init__(self, workspace_folder, bbs, app, folder = None, adlsClient = None):
         self.Bbs = bbs
         self.App = app
         if folder:
@@ -259,6 +260,7 @@ class AppContext:
 
         self.AppFolder = os.path.join(workspace_folder, app, self.Folder)
         os.makedirs(self.AppFolder, exist_ok=True)
+        self.AdlsClient = adlsClient
 
     def get_day(self, year, month, day):
         day_folder = os.path.join(self.AppFolder, '{0}-{1}-{2}'.format(year, str(month).zfill(2), str(day).zfill(2)))
@@ -269,3 +271,6 @@ class AppContext:
         folders = bbs.list_blobs(container, delimiter='/')
         folder = max([d.name[:-1] for d in filter(lambda d: d.name[-1] == '/', folders)])
         return folder
+
+    def get_stats(self):
+        return StatsContext(os.path.join(self.Folder, 'stats'), self.AdlsClient, self.App)
