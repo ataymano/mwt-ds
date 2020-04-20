@@ -41,7 +41,7 @@ class DsJson:
     @staticmethod
     def get_dangling_reward(line):
         parsed = json.loads(line[:-2])
-        return {'Timestamp': pd.to_datetime(parsed['EnqueuedTimeUtc']), 'EventId': parsed['EventId']}
+        return {'Timestamp': pd.to_datetime(parsed['EnqueuedTimeUtc']), 'EventId': parsed['EventId'], 'Reward': parsed['RewardValue']}
 
     @staticmethod
     def get_ccb_event(line):

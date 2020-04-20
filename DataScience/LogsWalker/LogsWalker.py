@@ -55,9 +55,11 @@ class AzureStorageBlob:
         self.__Bbs__ = bbs
         self.Container = container
         self.Path = path
+        self.MaxConnections = 4
 
     def download(self, path, start_offset, end_offset):
-        self.__Bbs__.get_blob_to_path(self.Container, self.Path, path, start_range=start_offset, end_range=end_offset)
+        self.__Bbs__.get_blob_to_path(self.Container, self.Path, path,
+            start_range=start_offset, end_range=end_offset, max_connections = self.MaxConnections)
 
     def get_size(self):
         bp = self.__Bbs__.get_blob_properties(self.Container, self.Path)
@@ -189,15 +191,19 @@ class DsJsonDayView:
     def __init__(self, azure_storage_blob_view):
         self.Impl = azure_storage_blob_view
 
+    def dangling_reward_lines(self):
+        return filter(lambda l: DsJson.is_dangling_reward(l), self.Impl.read())
+
+    def ccb_decision_lines(self):
+        return filter(lambda l: DsJson.is_ccb_event(l), self.Impl.read())
+
     def dangling_rewards(self):
         df = pd.DataFrame(
-            map(lambda l: DsJson.get_dangling_reward(l),
-                filter(lambda l: DsJson.is_dangling_reward(l), self.Impl.read())))
+            map(lambda l: DsJson.get_dangling_reward(l), self.dangling_reward_lines()))
         return df.set_index('Timestamp')
 
     def ccb_events(self):
-        events = map(lambda l: DsJson.ccb_2_cb(*DsJson.get_ccb_event(l)),
-                     filter(lambda l: DsJson.is_ccb_event(l), self.Impl.read()))
+        events = map(lambda l: DsJson.ccb_2_cb(*DsJson.get_ccb_event(l)), self.ccb_decision_lines())
         df = pd.DataFrame(itertools.chain(*events))
         return df.set_index('Timestamp')
 
@@ -214,13 +220,11 @@ class DsJsonDayView:
 
 
 class DsJsonDayClient:
-    def __init__(self, bbs, app, folder, year, month, day, local_folder):
-        self.Year = year
-        self.Month = month
-        self.Day = day
+    def __init__(self, bbs, app, folder, date, local_folder):
+        self.Date = date
         self.App = app
 
-        azure_path = '{0}/data/{1}/{2}/{3}_0.json'.format(folder, year, str(month).zfill(2), str(day).zfill(2))
+        azure_path = '{0}/data/{1}/{2}/{3}_0.json'.format(folder, date.year, str(date.month).zfill(2), str(date.day).zfill(2))
 
         self.__Asb__ = AzureStorageBlob(bbs, app, azure_path)
         self.Folder = local_folder
@@ -240,14 +244,14 @@ class DsJsonDayClient:
     def lookup(self, hours, minutes, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
                iterations_limit=10):
         import pytz
-        dt = datetime.datetime(self.Year, self.Month, self.Day, hours, minutes, 0, tzinfo=pytz.utc)
+        dt = datetime.datetime(self.Date.year, self.Date.month, self.Date.may, hours, minutes, 0, tzinfo=pytz.utc)
         return self.__Index__.lookup(dt, tolerance, offset_limit, iterations_limit)
 
     def overview(self):
         size = self.get_size()
         _, last_ts = self.__Index__.__get_offset_info___(size - 1024 ** 2, 1024 ** 2 - 1)
         return pd.DataFrame([{'App': self.App,
-                              'Day': '{0}-{1}-{2}'.format(self.Year, self.Month, self.Day),
+                              'Day': self.Date,
                               'Size': '{:.2f} GB'.format(size / (1024 ** 3)),
                               'LastTimestamp': last_ts}])
 
@@ -266,9 +270,9 @@ class AppContext:
         os.makedirs(self.AppFolder, exist_ok=True)
         self.AdlsClient = adlsClient
 
-    def get_day(self, year, month, day):
-        day_folder = os.path.join(self.AppFolder, '{0}-{1}-{2}'.format(year, str(month).zfill(2), str(day).zfill(2)))
-        return DsJsonDayClient(self.Bbs, self.App, self.Folder, year, month, day, day_folder)
+    def get_day(self, date):
+        day_folder = os.path.join(self.AppFolder, '{0}-{1}-{2}'.format(date.year, str(date.month).zfill(2), str(date.day).zfill(2)))
+        return DsJsonDayClient(self.Bbs, self.App, self.Folder, date, day_folder)
 
     @staticmethod
     def __get_latest_folder__(bbs, container):

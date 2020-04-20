@@ -10,6 +10,10 @@ def adls_download(adls, adlsPath, localPath, buffersize = 4 * 1024 **2, blocksiz
 
 class Statistics:
     @staticmethod
+    def get_stats(path):
+        return pd.read_csv(path, parse_dates=['hour']).drop(['clicks1', 'impressions1'], axis=1).set_index(['hour'])
+
+    @staticmethod
     def concat(substats):
         stats = pd.concat(substats)
         stats['tmp'] = stats.PassRatio * stats.impressions
@@ -17,7 +21,7 @@ class Statistics:
         stats = stats.groupby(['hour', 'model']).sum() \
             [['obser', 'clicks', 'impressions', 'clicksIps1', 'impressionsIps1', 'clicksIpsR', 'impressionsIpsR', 'tmp']]
         stats['PassRatio'] = stats.tmp / stats.impressions
-        return stats.drop(['tmp'], axis=1)
+        return stats.drop(['tmp'], axis=1).reset_index(['model'])
 
     def add_baselines(self, stats):
         stats['Online'] = stats.clicks / stats.impressions
@@ -25,6 +29,10 @@ class Statistics:
         stats['BaselineR'] = stats.clicksIpsR / stats.impressionsIpsR
         return stats
 
+class SlimLogs:
+    @staticmethod
+    def get_dangling_rewards(path):
+        return pd.read_csv(path, parse_dates=['EnqueuedTimeUtc']).set_index('EventId')
 
 class StatsContext:
     def __init__(self, local_folder, adlsClient, app, folder = 'daily'):
@@ -34,31 +42,62 @@ class StatsContext:
         os.makedirs(self.LocalFolder, exist_ok=True)
 
     @staticmethod
-    def __get_path_suffix__(year, month, day):
-        return '{0}-{1}-{2}'.format(year, str(month).zfill(2), str(day).zfill(2))
+    def __get_path_suffix__(date):
+        return '{0}-{1}-{2}'.format(date.year, str(date.month).zfill(2), str(date.day).zfill(2))
 
-    def get_stats(self, year, month, day):
-        suffix = StatsContext.__get_path_suffix__(year, month, day)
+    def download_stats(self, date):
+        suffix = StatsContext.__get_path_suffix__(date)       
 
         stats_h_file = 'statistics-h-{0}.csv'.format(suffix)
         stats_h_adls = '{0}/{1}'.format(self.AdlsFolder, stats_h_file)
-        stats_h_local = os.path.join(self.LocalFolder, stats_h_file) 
-        adls_download(self.__Adls__, stats_h_adls, stats_h_local)
-        return pd.read_csv(stats_h_local, parse_dates=['hour']).drop(['clicks1', 'impressions1'], axis=1).set_index(['hour', 'model'])
+        stats_h_local = os.path.join(self.LocalFolder, stats_h_file)
 
-    def download_interactions(self, year, month, day):
-        suffix = StatsContext.__get_path_suffix__(year, month, day)
+        if os.path.exists(stats_h_local):
+            os.remove(stats_h_local)
+
+        adls_download(self.__Adls__, stats_h_adls, stats_h_local)
+
+    def get_stats(self, date):
+        suffix = StatsContext.__get_path_suffix__(date)
+        stats_h_file = 'statistics-h-{0}.csv'.format(suffix)
+        stats_h_local = os.path.join(self.LocalFolder, stats_h_file)
+
+        if not os.path.exists(stats_h_local):
+            self.download_stats(date)
+
+        return Statistics.get_stats(stats_h_local)
+
+    def download_interactions(self, date):
+        suffix = StatsContext.__get_path_suffix__(date)
 
         interactions_h_file = 'interactions-{0}.csv'.format(suffix)
         interactions_h_adls = '{0}/{1}'.format(self.AdlsFolder, interactions_h_file)
-        interactions_h_local = os.path.join(self.LocalFolder, interactions_h_file) 
+        interactions_h_local = os.path.join(self.LocalFolder, interactions_h_file)
+
+        if os.path.exists(interactions_h_local):
+            os.remove(interactions_h_local)
+
         adls_download(self.__Adls__, interactions_h_adls, interactions_h_local)
 
-    def get_dangling_rewards(self, year, month, day):
-        suffix = StatsContext.__get_path_suffix__(year, month, day)
+    def download_dangling_rewards(self, date):
+        suffix = StatsContext.__get_path_suffix__(date)
 
         dangling_h_file = 'dangling-{0}.csv'.format(suffix)
         dangling_h_adls = '{0}/{1}'.format(self.AdlsFolder, dangling_h_file)
-        dangling_h_local = os.path.join(self.LocalFolder, dangling_h_file) 
+        dangling_h_local = os.path.join(self.LocalFolder, dangling_h_file)
+
+        if os.path.exists(dangling_h_local):
+            os.remove(dangling_h_local)
+
         adls_download(self.__Adls__, dangling_h_adls, dangling_h_local)
-        return pd.read_csv(dangling_h_local, parse_dates=['EnqueuedTimeUtc']).set_index('EventId')
+
+    def get_dangling_rewards(self, date):
+        suffix = StatsContext.__get_path_suffix__(date)
+
+        dangling_h_file = 'dangling-{0}.csv'.format(suffix)
+        dangling_h_local = os.path.join(self.LocalFolder, dangling_h_file) 
+        
+        if not os.path.exists(dangling_h_local):
+            self.download_stats(date)
+
+        return SlimLogs.get_dangling_rewards(dangling_h_local)
