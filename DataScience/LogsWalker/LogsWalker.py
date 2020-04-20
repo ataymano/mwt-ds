@@ -201,6 +201,10 @@ class DsJsonDayView:
         df = pd.DataFrame(itertools.chain(*events))
         return df.set_index('Timestamp')
 
+    def contexts(self):
+        return map(lambda e: DsJson.get_context(e),
+            filter(lambda l: DsJson.is_ccb_event(l), self.Impl.read()))
+
     def read(self):
         return self.Impl.read()
 
