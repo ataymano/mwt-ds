@@ -157,7 +157,7 @@ class AzureDsJsonTimestampIndex:
         pos = bisect.bisect_left(keys, ts)
         last = index[keys[pos]] if pos < len(keys) else None
         first = index[keys[pos - 1]] if pos > 0 else 0
-        first_dt = date = datetime.datetime.fromtimestamp(ts, tz=pytz.utc) if pos > 0 else None
+        first_dt = datetime.datetime.fromtimestamp(ts, tz=pytz.utc) if pos > 0 else None
         return first, last, first_dt
 
     def lookup(self, timestamp, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
@@ -283,7 +283,7 @@ class AppContext:
         return folder
 
     def get_stats(self):
-        return StatsContext(self.StatsFolder, self.AdlsClient, self.App)
+        return StatsContext(self.StatsFolder, self.AdlsClient, self.App, model=self.Folder)
 
 class Workspace:
     def __init__(self, folder, bbs = None, adls = None):
