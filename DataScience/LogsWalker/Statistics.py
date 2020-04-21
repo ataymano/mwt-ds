@@ -1,4 +1,5 @@
 from azure.datalake.store import core, lib, multithread
+import itertools
 import datetime
 from Helpers import DateTime
 import pandas as pd
@@ -11,20 +12,25 @@ def adls_download(adls, adlsPath, localPath, buffersize = 4 * 1024 **2, blocksiz
 
 class Statistics:
     @staticmethod
-    def get_stats(path):
-        return pd.read_csv(path, parse_dates=['hour']).drop(['clicks1', 'impressions1'], axis=1).set_index(['hour'])
+    def __read_stats__(path, time_column):
+        return pd.read_csv(path, parse_dates=[time_column]).drop(['clicks1', 'impressions1'], axis=1).set_index([time_column])
 
     @staticmethod
-    def concat(substats):
+    def read_stats(paths, time_column = 'hour'):
+        return Statistics.concat([Statistics.__read_stats__(p, time_column) for p in paths], time_column)
+
+    @staticmethod
+    def concat(substats, time_column = 'hour'):
         stats = pd.concat(substats)
         stats['tmp'] = stats.PassRatio * stats.impressions
         stats = stats.drop(['PassRatio'], axis = 1)
-        stats = stats.groupby(['hour', 'model']).sum() \
+        stats = stats.groupby([time_column, 'model']).sum() \
             [['obser', 'clicks', 'impressions', 'clicksIps1', 'impressionsIps1', 'clicksIpsR', 'impressionsIpsR', 'tmp']]
         stats['PassRatio'] = stats.tmp / stats.impressions
         return stats.drop(['tmp'], axis=1).reset_index(['model'])
 
-    def add_baselines(self, stats):
+    @staticmethod
+    def add_baselines(stats):
         stats['Online'] = stats.clicks / stats.impressions
         stats['Baseline1'] = stats.clicksIps1 / stats.impressionsIps1
         stats['BaselineR'] = stats.clicksIpsR / stats.impressionsIpsR
@@ -32,12 +38,12 @@ class Statistics:
 
 class SlimLogs:
     @staticmethod
-    def get_dangling_rewards(path):
-        return pd.read_csv(path, parse_dates=['EnqueuedTimeUtc'])
+    def read_dangling_rewards(path, chunksize = None):
+        return pd.read_csv(path, parse_dates=['EnqueuedTimeUtc'], chunksize = chunksize)
 
     @staticmethod
-    def get_decisions(path):
-        return pd.read_csv(path, parse_dates=['Timestamp'])
+    def read_decisions(path, chunksize = None):
+        return pd.read_csv(path, parse_dates=['Timestamp'], chunksize = chunksize)
 
 class StatsContext:
     def __init__(self, local_folder, adlsClient, app, model=None, adls_folder = 'daily'):
@@ -46,9 +52,6 @@ class StatsContext:
         self.LocalFolder = local_folder
         self.Model = model
         os.makedirs(self.LocalFolder, exist_ok=True)
-
-    def __filter_by_model__(self, df):
-        return df if self.Model == None else df[df.model == int(self.Model)]
 
     @staticmethod
     def __get_path_suffix__(date):
@@ -69,33 +72,6 @@ class StatsContext:
                 return None
         return f_local
 
-    def download_stats(self, first, last = None):
+    def get(self, prefix, first, last = None, reset=False):
         if not last: last = first + datetime.timedelta(days=1)
-        for d in DateTime.range(first, last):
-            self.__get_file__('statistics-h', d, reset=True)
-
-    def get_stats(self, first, last = None):
-        if not last: last = first + datetime.timedelta(days=1)
-        return self.__filter_by_model__(Statistics.concat([Statistics.get_stats(p) for p in
-            filter(lambda s : s is not None,[self.__get_file__('statistics-h', d) for d in DateTime.range(first, last)])]))
-
-    def download_decisions(self, first, last = None):
-        if not last: last = first + datetime.timedelta(days=1)
-        for d in DateTime.range(first, last):
-            self.__get_file__('interactions', d, reset=True)
-
-    def get_decisions(self, first, last = None):
-        if not last: last = first + datetime.timedelta(days=1)
-        return self.__filter_by_model__(pd.concat([SlimLogs.get_decisions(p) for p in 
-            filter(lambda s : s is not None,[self.__get_file__('interactions', d) for d in DateTime.range(first, last)])]))
-
-    def download_dangling_rewards(self, first, last = None):
-        if not last: last = first + datetime.timedelta(days=1)
-        for d in DateTime.range(first, last):
-            self.__get_file__('dangling', d, reset=True)
-
-    def get_dangling_rewards(self, first, last = None):
-        if not last: last = first + datetime.timedelta(days=1)
-        return self.__filter_by_model__(pd.concat([SlimLogs.get_dangling_rewards(p) for p in 
-            filter(lambda s : s is not None,[self.__get_file__('dangling', d) for d in DateTime.range(first, last)])]))
-
+        return list(filter(lambda s : s is not None,[self.__get_file__(prefix, d) for d in DateTime.range(first, last)]))
