@@ -244,7 +244,7 @@ class DsJsonDayClient:
     def lookup(self, hours, minutes, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
                iterations_limit=10):
         import pytz
-        dt = datetime.datetime(self.Date.year, self.Date.month, self.Date.may, hours, minutes, 0, tzinfo=pytz.utc)
+        dt = datetime.datetime(self.Date.year, self.Date.month, self.Date.day, hours, minutes, 0, tzinfo=pytz.utc)
         return self.__Index__.lookup(dt, tolerance, offset_limit, iterations_limit)
 
     def overview(self):
@@ -268,6 +268,8 @@ class AppContext:
 
         self.AppFolder = os.path.join(workspace_folder, app, self.Folder)
         os.makedirs(self.AppFolder, exist_ok=True)
+
+        self.StatsFolder = os.path.join(workspace_folder, app, 'stats')
         self.AdlsClient = adlsClient
 
     def get_day(self, date):
@@ -281,7 +283,7 @@ class AppContext:
         return folder
 
     def get_stats(self):
-        return StatsContext(os.path.join(self.Folder, 'stats'), self.AdlsClient, self.App)
+        return StatsContext(self.StatsFolder, self.AdlsClient, self.App)
 
 class Workspace:
     def __init__(self, folder, bbs = None, adls = None):

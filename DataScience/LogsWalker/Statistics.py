@@ -1,4 +1,6 @@
 from azure.datalake.store import core, lib, multithread
+import datetime
+from Helpers import DateTime
 import pandas as pd
 import os
 
@@ -6,7 +8,6 @@ def adls_download(adls, adlsPath, localPath, buffersize = 4 * 1024 **2, blocksiz
     if os.path.exists(localPath):
         os.remove(localPath)
     multithread.ADLDownloader(adls, lpath=localPath, rpath=adlsPath, overwrite=True)
-
 
 class Statistics:
     @staticmethod
@@ -32,72 +33,69 @@ class Statistics:
 class SlimLogs:
     @staticmethod
     def get_dangling_rewards(path):
-        return pd.read_csv(path, parse_dates=['EnqueuedTimeUtc']).set_index('EventId')
+        return pd.read_csv(path, parse_dates=['EnqueuedTimeUtc'])
+
+    @staticmethod
+    def get_decisions(path):
+        return pd.read_csv(path, parse_dates=['Timestamp'])
 
 class StatsContext:
-    def __init__(self, local_folder, adlsClient, app, folder = 'daily'):
+    def __init__(self, local_folder, adlsClient, app, model=None, adls_folder = 'daily'):
         self.__Adls__ = adlsClient
-        self.AdlsFolder = '{0}/{1}'.format(folder, app)
+        self.AdlsFolder = '{0}/{1}'.format(adls_folder, app)
         self.LocalFolder = local_folder
+        self.Model = model
         os.makedirs(self.LocalFolder, exist_ok=True)
+
+    def __filter_by_model__(self, df):
+        return df if self.Model == None else df[df.model == int(self.Model)]
 
     @staticmethod
     def __get_path_suffix__(date):
         return '{0}-{1}-{2}'.format(date.year, str(date.month).zfill(2), str(date.day).zfill(2))
 
-    def download_stats(self, date):
-        suffix = StatsContext.__get_path_suffix__(date)       
-
-        stats_h_file = 'statistics-h-{0}.csv'.format(suffix)
-        stats_h_adls = '{0}/{1}'.format(self.AdlsFolder, stats_h_file)
-        stats_h_local = os.path.join(self.LocalFolder, stats_h_file)
-
-        if os.path.exists(stats_h_local):
-            os.remove(stats_h_local)
-
-        adls_download(self.__Adls__, stats_h_adls, stats_h_local)
-
-    def get_stats(self, date):
+    def __get_file__(self, prefix, date, reset=False):
         suffix = StatsContext.__get_path_suffix__(date)
-        stats_h_file = 'statistics-h-{0}.csv'.format(suffix)
-        stats_h_local = os.path.join(self.LocalFolder, stats_h_file)
+        fname = '{0}-{1}.csv'.format(prefix, suffix)
+        f_adls = '{0}/{1}'.format(self.AdlsFolder, fname)
+        f_local = os.path.join(self.LocalFolder, fname)
+        if reset and os.path.exists(f_local):
+            os.remove(f_local)
+            
+        if not os.path.exists(f_local):
+            try:
+                adls_download(self.__Adls__, f_adls, f_local)
+            except Exception as e:
+                return None
+        return f_local
 
-        if not os.path.exists(stats_h_local):
-            self.download_stats(date)
+    def download_stats(self, first, last = None):
+        if not last: last = first + datetime.timedelta(days=1)
+        for d in DateTime.range(first, last):
+            self.__get_file__('statistics-h', d, reset=True)
 
-        return Statistics.get_stats(stats_h_local)
+    def get_stats(self, first, last = None):
+        if not last: last = first + datetime.timedelta(days=1)
+        return self.__filter_by_model__(Statistics.concat([Statistics.get_stats(p) for p in
+            filter(lambda s : s is not None,[self.__get_file__('statistics-h', d) for d in DateTime.range(first, last)])]))
 
-    def download_interactions(self, date):
-        suffix = StatsContext.__get_path_suffix__(date)
+    def download_decisions(self, first, last = None):
+        if not last: last = first + datetime.timedelta(days=1)
+        for d in DateTime.range(first, last):
+            self.__get_file__('interactions', d, reset=True)
 
-        interactions_h_file = 'interactions-{0}.csv'.format(suffix)
-        interactions_h_adls = '{0}/{1}'.format(self.AdlsFolder, interactions_h_file)
-        interactions_h_local = os.path.join(self.LocalFolder, interactions_h_file)
+    def get_decisions(self, first, last = None):
+        if not last: last = first + datetime.timedelta(days=1)
+        return self.__filter_by_model__(pd.concat([SlimLogs.get_decisions(p) for p in 
+            filter(lambda s : s is not None,[self.__get_file__('interactions', d) for d in DateTime.range(first, last)])]))
 
-        if os.path.exists(interactions_h_local):
-            os.remove(interactions_h_local)
+    def download_dangling_rewards(self, first, last = None):
+        if not last: last = first + datetime.timedelta(days=1)
+        for d in DateTime.range(first, last):
+            self.__get_file__('dangling', d, reset=True)
 
-        adls_download(self.__Adls__, interactions_h_adls, interactions_h_local)
+    def get_dangling_rewards(self, first, last = None):
+        if not last: last = first + datetime.timedelta(days=1)
+        return self.__filter_by_model__(pd.concat([SlimLogs.get_dangling_rewards(p) for p in 
+            filter(lambda s : s is not None,[self.__get_file__('dangling', d) for d in DateTime.range(first, last)])]))
 
-    def download_dangling_rewards(self, date):
-        suffix = StatsContext.__get_path_suffix__(date)
-
-        dangling_h_file = 'dangling-{0}.csv'.format(suffix)
-        dangling_h_adls = '{0}/{1}'.format(self.AdlsFolder, dangling_h_file)
-        dangling_h_local = os.path.join(self.LocalFolder, dangling_h_file)
-
-        if os.path.exists(dangling_h_local):
-            os.remove(dangling_h_local)
-
-        adls_download(self.__Adls__, dangling_h_adls, dangling_h_local)
-
-    def get_dangling_rewards(self, date):
-        suffix = StatsContext.__get_path_suffix__(date)
-
-        dangling_h_file = 'dangling-{0}.csv'.format(suffix)
-        dangling_h_local = os.path.join(self.LocalFolder, dangling_h_file) 
-        
-        if not os.path.exists(dangling_h_local):
-            self.download_stats(date)
-
-        return SlimLogs.get_dangling_rewards(dangling_h_local)
