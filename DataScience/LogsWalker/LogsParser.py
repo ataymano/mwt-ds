@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 import uuid
+import itertools
 
 class NaiveJson:
     def __init__(self, line):
@@ -34,17 +35,17 @@ class DsJson:
         return pd.to_datetime(obj.get_string("Timestamp"))
 
     @staticmethod
-    def get_context(line):
+    def context(line):
         parsed = json.loads(line)
         return json.dumps(parsed['c']) + '\n'
 
     @staticmethod
-    def get_dangling_reward(line):
+    def dangling_reward(line):
         parsed = json.loads(line[:-2])
         return {'Timestamp': pd.to_datetime(parsed['EnqueuedTimeUtc']), 'EventId': parsed['EventId'], 'Reward': parsed['RewardValue']}
 
     @staticmethod
-    def get_ccb_event(line):
+    def ccb_event(line):
         parsed = json.loads(line)
         session = {'Session': str(uuid.uuid4()),
                  'Timestamp': pd.to_datetime(parsed['Timestamp']),
@@ -64,3 +65,34 @@ class DsJson:
     @staticmethod
     def ccb_2_cb(session, slots):
         return [dict(session, **s) for s in slots]
+
+    @staticmethod
+    def dangling_reward_lines(lines):
+        return filter(lambda l: DsJson.is_dangling_reward(l), lines)
+
+    @staticmethod
+    def ccb_decision_lines(lines):
+        return filter(lambda l: DsJson.is_ccb_event(l), lines)
+    
+    @staticmethod
+    def dangling_rewards(lines):
+        df = pd.DataFrame(
+            map(lambda l: DsJson.dangling_reward(l), lines))
+        return df.set_index('Timestamp')
+
+    @staticmethod
+    def ccb_events(lines):
+        events = map(lambda l: DsJson.ccb_2_cb(*DsJson.ccb_event(l)), DsJson.ccb_decision_lines(lines))
+        df = pd.DataFrame(itertools.chain(*events))
+        return df.set_index('Timestamp')
+
+    @staticmethod
+    def contexts(lines):
+        return map(lambda e: DsJson.context(e),
+            filter(lambda l: DsJson.is_ccb_event(l), lines))
+    
+    @staticmethod
+    def first_timestamp(lines):
+        line = next(lines)
+        return DsJson.get_timestamp(line)
+
