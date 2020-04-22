@@ -9,8 +9,8 @@ import datetime
 import json
 
 class Workspace(Context):
-    def __init__(self, path, bbs=None, adls=None):
-        super().__init__(path)
+    def __init__(self, path, bbs=None, adls=None, debug=False):
+        super().__init__(path, parent=None, reset=False, debug=debug)
         self.__Bbs__ = bbs
         self.__Adls__ = adls
 

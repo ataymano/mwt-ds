@@ -61,8 +61,12 @@ class AzureStorageBlob:
                 start_range=start_offset, end_range=end_offset, max_connections = self.MaxConnections)
             return True
         except:
+            print('Cannot download {0} to {1}'.format(self.Path, path))
             return False
 
     def get_size(self):
-        bp = self.__Bbs__.get_blob_properties(self.Container, self.Path)
-        return bp.properties.content_length
+        try:
+            bp = self.__Bbs__.get_blob_properties(self.Container, self.Path)
+            return bp.properties.content_length
+        except:
+            print('Cannot get size of {0}'.format(self.Path))
