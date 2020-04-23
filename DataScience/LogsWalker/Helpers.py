@@ -16,9 +16,8 @@ class AzureStorage:
         return datetime.date(int(dirs[2]), int(dirs[3]), int(dirs[4].split('_')[0]))
 
     @staticmethod
-    def get_latest_day(bbs, container, model):
-        dates = [AzureStorage.get_date(b.name) for b in bbs.list_blobs(container, prefix='{0}/data/'.format(model))]
-        return max(dates)
+    def get_days(bbs, container, model):
+        return [AzureStorage.get_date(b.name) for b in bbs.list_blobs(container, prefix='{0}/data/'.format(model))]
 
 class Adls:
     @staticmethod

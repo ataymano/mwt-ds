@@ -35,9 +35,6 @@ class AppContext(Context):
     def get_instance(self, model=None):
         return InstanceContext(self, model)
 
-    def get_postproc(self, adls_path):
-        return PostProcContext(self, adls_path)
-
 class InstanceContext(Context):
     def __init__(self, app_context, model=None):
         if not model:
@@ -47,13 +44,24 @@ class InstanceContext(Context):
 
     def get_day(self, date = None):
         if not date:
-            date = AzureStorage.get_latest_day(self.Parent.Parent.Bbs(), self.Parent.App, self.Model)
+            date = max(AzureStorage.get_days(self.Parent.Parent.Bbs(), self.Parent.App, self.Model))
         return DayContext(self, date)
 
-    def get_stats(self, start_date, end_date, prefix='statistics-m', time_column='min', adls_path='daily'):
-        postproc = self.Parent.get_postproc(adls_path)
-        all = postproc.get_stats(start_date, end_date, prefix, time_column)
-        return all[all.model == self.Model].drop(['model'], axis = 1)
+    def get_stats(self, start_date, end_date, prefix='statistics', time_column='Timestamp', adls_path='daily'):
+        postproc = PostProcContext(self, adls_path)
+        return postproc.get_stats(start_date, end_date, prefix, time_column)
+
+    def overview(self):
+        days = AzureStorage.get_days(self.Parent.Parent.Bbs(), self.Parent.App, self.Model)
+        day = self.get_day(max(days))
+        size = day.get_size()
+        _, last_ts = day.__Index__.__get_offset_info___(size - 1024 ** 2, 1024 ** 2 - 1)
+        return pd.DataFrame([{'App': self.Parent.App,
+                              'Model': self.Model,
+                              'First day': min(days),
+                              'Last day': max(days),
+                              'Last day size': '{:.2f} GB'.format(size / (1024 ** 3)),
+                              'Last timestamp': last_ts}])
 
 class DayContext(Context):
     def __init__(self, instance_context, date):
@@ -79,19 +87,20 @@ class DayContext(Context):
         size = self.get_size()
         _, last_ts = self.__Index__.__get_offset_info___(size - 1024 ** 2, 1024 ** 2 - 1)
         return pd.DataFrame([{'App': self.Parent.Parent.App,
+                              'Model': self.Parent.Model,
                               'Day': self.Date,
                               'Size': '{:.2f} GB'.format(size / (1024 ** 3)),
                               'LastTimestamp': last_ts}])
 
 class PostProcContext(Context):
-    def __init__(self, app_context, adls_path):
-        super().__init__('postproc', app_context)
+    def __init__(self, instance_context, adls_path):
+        super().__init__('postproc', instance_context)
         self.AdlsPath = adls_path
 
     def get(self, prefix, date):
         return PostProcData(self, prefix, date)
     
-    def get_stats(self, start_date, end_date, prefix='statistics-m', time_column='min'):
+    def get_stats(self, start_date, end_date, prefix='statistics', time_column='Timestamp'):
         all = [self.get(prefix, d) for d in DateTime.range(start_date, end_date)]
         ready = list(filter(lambda s: s.Exists, all))
         paths = [s.FullPath for s in ready]
@@ -103,8 +112,9 @@ class PostProcData(Data):
         super().__init__('{0}-{1}.csv'.format(prefix, str(date)), postproc_context)
 
     def __load__(self):
-        path_server = '{0}/{1}/{2}'.format(self.Context.AdlsPath, self.Context.Parent.App, self.Path)
-        return Adls.adls_download(self.Context.Parent.Parent.Adls(), path_server, self.FullPath)
+        path_server = '{0}/{1}/{2}/{3}'.format(self.Context.AdlsPath, self.Context.Parent.Parent.App,
+            self.Context.Parent.Model, self.Path)
+        return Adls.adls_download(self.Context.Parent.Parent.Parent.Adls(), path_server, self.FullPath)
 
 class DaySegment(Data):
     def __init__(self, day_context, start_offset, end_offset, temporary=False):

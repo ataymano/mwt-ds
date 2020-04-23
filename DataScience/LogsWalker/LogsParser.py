@@ -77,7 +77,7 @@ class DsJson:
     @staticmethod
     def dangling_rewards(lines):
         df = pd.DataFrame(
-            map(lambda l: DsJson.dangling_reward(l), lines))
+            map(lambda l: DsJson.dangling_reward(l), DsJson.dangling_reward_lines(lines)))
         return df.set_index('Timestamp')
 
     @staticmethod
