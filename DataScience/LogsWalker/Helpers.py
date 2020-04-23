@@ -11,9 +11,14 @@ class AzureStorage:
         return folder
 
     @staticmethod
-    def download_segment(bbs, container, path_server, start_offset, end_offset, path_local, max_connections=4):
-        bbs.get_blob_to_path(container, path_server, path_local,
-            start_range=start_offset, end_range=end_offset, max_connections=max_connections)
+    def get_date(path):
+        dirs = path.split('/')
+        return datetime.date(int(dirs[2]), int(dirs[3]), int(dirs[4].split('_')[0]))
+
+    @staticmethod
+    def get_latest_day(bbs, container, model):
+        dates = [AzureStorage.get_date(b.name) for b in bbs.list_blobs(container, prefix='{0}/data/'.format(model))]
+        return max(dates)
 
 class Adls:
     @staticmethod

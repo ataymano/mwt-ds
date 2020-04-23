@@ -45,7 +45,9 @@ class InstanceContext(Context):
         super().__init__(model, app_context)
         self.Model=int(model)
 
-    def get_day(self, date):
+    def get_day(self, date = None):
+        if not date:
+            date = AzureStorage.get_latest_day(self.Parent.Parent.Bbs(), self.Parent.App, self.Model)
         return DayContext(self, date)
 
     def get_stats(self, start_date, end_date, prefix='statistics-m', time_column='min', adls_path='daily'):
