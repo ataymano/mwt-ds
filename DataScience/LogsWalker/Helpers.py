@@ -2,6 +2,15 @@ from azure.datalake.store import core, lib, multithread
 from azure.storage.blob import BlockBlobService
 import os
 import datetime
+import sys
+
+def update_progress(current, total):
+    barLength = 50 # Length of the progress bar
+    progress = current/total
+    block = int(barLength*progress)
+    text = "\rProgress: [{0}] {1:.1f}%".format( "#"*block + "-"*(barLength-block), progress*100)
+    sys.stdout.write(text)
+    sys.stdout.flush()
 
 class AzureStorage:
     @staticmethod
@@ -21,13 +30,14 @@ class AzureStorage:
 
 class Adls:
     @staticmethod
-    def adls_download(adls, path_server, path_local, buffersize=4 * 1024 **2, blocksize=4 * 1024):
+    def adls_download(adls, path_server, path_local, buffersize=4 * 1024 **2, blocksize=4 * 1024, log=print):
         try:
-            print('Downloading {0}'.format(path_server))
+            log('Downloading {0}'.format(path_server))
             multithread.ADLDownloader(adls, lpath=path_local, rpath=path_server, overwrite=True)
-            print('Done')
+            log('Done')
             return True
         except:
+            log('Cannot download {0}'.format(path_server))
             return False  
 
 class File:
@@ -53,19 +63,22 @@ class DateTime:
         return [first + datetime.timedelta(days=i) for i in range((second - first).days)]
 
 class AzureStorageBlob:
-    def __init__(self, bbs, container, path):
+    def __init__(self, bbs, container, path, log = print):
         self.__Bbs__ = bbs
         self.Container = container
         self.Path = path
         self.MaxConnections = 4
+        self.Log = log
 
-    def download(self, path, start_offset, end_offset):
+    def download(self, path, start_offset, end_offset = None, with_progress = False):
         try:
             self.__Bbs__.get_blob_to_path(self.Container, self.Path, path,
-                start_range=start_offset, end_range=end_offset, max_connections = self.MaxConnections)
+                start_range=start_offset, end_range=end_offset, max_connections = self.MaxConnections,
+                progress_callback=update_progress if with_progress else None)
+            self.Log('')
             return True
         except:
-            print('Cannot download {0} to {1}'.format(self.Path, path))
+            self.Log('Cannot download {0} to {1}'.format(self.Path, path))
             return False
 
     def get_size(self):
@@ -73,4 +86,4 @@ class AzureStorageBlob:
             bp = self.__Bbs__.get_blob_properties(self.Container, self.Path)
             return bp.properties.content_length
         except:
-            print('Cannot get size of {0}'.format(self.Path))
+            self.Log('Cannot get size of {0}'.format(self.Path))

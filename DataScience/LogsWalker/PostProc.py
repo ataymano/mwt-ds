@@ -22,3 +22,21 @@ class Statistics:
         stats['Baseline1'] = stats.clicksIps1 / stats.impressionsIps1
         stats['BaselineR'] = stats.clicksIpsR / stats.impressionsIpsR
         return stats
+
+class SlimLogs:
+    @staticmethod
+    def __read_dangling_rewards__(path):
+        return pd.read_csv(path, parse_dates=['EnqueuedTimeUtc'])
+
+    @staticmethod
+    def __read_decisions__(path, chunksize = None):
+        return pd.read_csv(path, parse_dates=['Timestamp'], chunksize = chunksize)
+
+    @staticmethod
+    def dangling_rewards(paths):
+        return pd.concat([SlimLogs.__read_dangling_rewards__(path) for path in paths])
+
+    @staticmethod
+    def decisions(paths):
+        return pd.concat([SlimLogs.__read_decisions__(path) for path in paths])
+

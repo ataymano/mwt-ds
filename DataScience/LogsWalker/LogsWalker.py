@@ -74,8 +74,8 @@ class DayContext(Context):
     def get_size(self):
         return self.Asb.get_size()
 
-    def get_segment(self, start, size):
-        return DaySegment(self, start, start + size)
+    def get_segment(self, start, size=None, temporary=False, with_progress=True):
+        return DaySegment(self, start, None if not size else start + size, temporary, with_progress)
 
     def lookup(self, hours, minutes, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
                iterations_limit=10):
@@ -114,12 +114,13 @@ class PostProcData(Data):
     def __load__(self):
         path_server = '{0}/{1}/{2}/{3}'.format(self.Context.AdlsPath, self.Context.Parent.Parent.App,
             self.Context.Parent.Model, self.Path)
-        return Adls.adls_download(self.Context.Parent.Parent.Parent.Adls(), path_server, self.FullPath)
+        return Adls.adls_download(self.Context.Parent.Parent.Parent.Adls(), path_server, self.FullPath, log=self.Context.log)
 
 class DaySegment(Data):
-    def __init__(self, day_context, start_offset, end_offset, temporary=False):
+    def __init__(self, day_context, start_offset, end_offset, temporary=False, with_progress=False):
         self.StartOffset = start_offset
         self.EndOffset = end_offset
+        self.WithProgress = with_progress
         super().__init__('view.{0}-{1}'.format(start_offset, end_offset), day_context)
         self.__Temporary__ = temporary
         if self.Exists:
@@ -127,7 +128,7 @@ class DaySegment(Data):
             self.__LastEof__ = File.find_last_eof(self.FullPath)
 
     def __load__(self):
-        return self.Context.Asb.download(self.FullPath, self.StartOffset, self.EndOffset)
+        return self.Context.Asb.download(self.FullPath, self.StartOffset, self.EndOffset, self.WithProgress)
 
     def __del__(self):
         if self.__Temporary__ and self.Exists:
@@ -151,11 +152,11 @@ class DayIndex(Data):
     def __init__(self, day_context):
         self.Index = {}
         super().__init__('index', day_context)
-
-    def __load__(self):
         if os.path.exists(self.FullPath):
             with open(self.FullPath, 'r') as f: 
                 self.Index = dict(json.load(f))
+
+    def __load__(self):
         return True
 
     def __save__(self):
@@ -175,7 +176,7 @@ class DayIndex(Data):
         pos = bisect.bisect_left(keys, ts)
         last = self.Index[keys[pos]] if pos < len(keys) else None
         first = self.Index[keys[pos - 1]] if pos > 0 else 0
-        first_dt = datetime.datetime.fromtimestamp(ts, tz=pytz.utc) if pos > 0 else None
+        first_dt = datetime.datetime.fromtimestamp(keys[pos - 1], tz=pytz.utc) if pos > 0 else None
         return first, last, first_dt
 
     def lookup(self, timestamp, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
