@@ -1,5 +1,5 @@
 from Core import Context, Data
-from PostProc import Statistics
+from PostProc import Statistics, SlimLogs
 from Helpers import AzureStorage, AzureStorageBlob, File, DateTime, Adls
 from LogsParser import DsJson
 
@@ -47,6 +47,10 @@ class InstanceContext(Context):
             date = max(AzureStorage.get_days(self.Parent.Parent.Bbs(), self.Parent.App, self.Model))
         return DayContext(self, date)
 
+    def get_dangling_rewards(self, start_date, end_date, prefix='dangling', adls_path='daily'):
+        postproc = PostProcContext(self, adls_path)
+        return postproc.get_dangling_rewards(start_date, end_date, prefix)
+
     def get_stats(self, start_date, end_date, prefix='statistics', time_column='Timestamp', adls_path='daily'):
         postproc = PostProcContext(self, adls_path)
         return postproc.get_stats(start_date, end_date, prefix, time_column)
@@ -68,7 +72,7 @@ class DayContext(Context):
         super().__init__(str(date), instance_context)
         self.Date = date
         azure_path = '{0}/data/{1}/{2}/{3}_0.json'.format(instance_context.Model, date.year, str(date.month).zfill(2), str(date.day).zfill(2))
-        self.Asb = AzureStorageBlob(self.Parent.Parent.Parent.Bbs(), self.Parent.Parent.App, azure_path)
+        self.Asb = AzureStorageBlob(self.Parent.Parent.Parent.Bbs(), self.Parent.Parent.App, azure_path, log=self.log)
         self.__Index__ = DayIndex(self)
 
     def get_size(self):
@@ -99,6 +103,12 @@ class PostProcContext(Context):
 
     def get(self, prefix, date):
         return PostProcData(self, prefix, date)
+
+    def get_dangling_rewards(self, start_date, end_date, prefix='dangling'):
+        all = [self.get(prefix, d) for d in DateTime.range(start_date, end_date)]
+        ready = list(filter(lambda s: s.Exists, all))
+        paths = [s.FullPath for s in ready]
+        return SlimLogs.dangling_rewards(paths)
     
     def get_stats(self, start_date, end_date, prefix='statistics', time_column='Timestamp'):
         all = [self.get(prefix, d) for d in DateTime.range(start_date, end_date)]
@@ -128,7 +138,11 @@ class DaySegment(Data):
             self.__LastEof__ = File.find_last_eof(self.FullPath)
 
     def __load__(self):
-        return self.Context.Asb.download(self.FullPath, self.StartOffset, self.EndOffset, self.WithProgress)
+        tmp = '{0}.tmp'.format(self.FullPath)
+        if self.Context.Asb.download(tmp, self.StartOffset, self.EndOffset, self.WithProgress):
+            os.rename(tmp, self.FullPath)
+            return True
+        return False
 
     def __del__(self):
         if self.__Temporary__ and self.Exists:
@@ -147,6 +161,12 @@ class DaySegment(Data):
                 if current is not None:
                     yield current
                 current = l
+
+    def save(self, name, dataframe):
+        dataframe.to_csv('{0}.{1}'.format(self.FullPath, name))
+
+    def load(self, name):
+        return pd.read_csv('{0}.{1}'.format(self.FullPath, name))
 
 class DayIndex(Data):
     def __init__(self, day_context):
