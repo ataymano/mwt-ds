@@ -17,6 +17,10 @@ class NaiveJson:
 class DsJson:
     @staticmethod
     def is_ccb_event(line):
+        try:
+            o = json.loads(line)
+        except:
+            return False
         return line.startswith('{"Timestamp"')
 
     @staticmethod
@@ -52,6 +56,11 @@ class DsJson:
                  'NumActions': len(parsed['c']['_multi']),
                  'NumSlots': len(parsed['c']['_slots']),
                  'VWState': parsed['VWState']['m']}
+
+        multi = [None] * len(parsed['c']['_multi'])
+   #     for i, o in enumerate(parsed['c']['_multi']):
+   #         multi[i] = {'Id': o['Id']}
+
         slots = [None] * len(parsed['_outcomes'])
         for i, o in enumerate(parsed['_outcomes']):
             slots[i] = {'SlotIdx': i,
@@ -60,10 +69,11 @@ class DsJson:
                     'ActionsPerSlot': len(o['_a']),
                     'Chosen': o['_a'][0],
                     'Prob': o['_p'][0]}
-        return session, slots
+        
+        return session, slots, multi
 
     @staticmethod
-    def ccb_2_cb(session, slots):
+    def ccb_2_cb(session, slots, multi):
         return [dict(session, **s) for s in slots]
 
     @staticmethod
