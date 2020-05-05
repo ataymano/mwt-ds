@@ -12,14 +12,15 @@ class Statistics:
     @staticmethod
     def concat(substats, time_column = 'Timestamp'):
         stats = pd.concat(substats)
-        stats = stats.groupby([time_column]).sum() \
-            [['obser', 'clicks', 'impressions', 'clicksIps1', 'impressionsIps1', 'clicksIpsR', 'impressionsIpsR', 'impressionsObserved']]
+        stats = stats.groupby([time_column]).sum()
         return stats
 
     @staticmethod
     def add_baselines(stats):
         stats['Online'] = stats.clicks / stats.impressions
         stats['Baseline1'] = stats.clicksIps1 / stats.impressionsIps1
+        if 'clicksIpsN1' in stats.columns:
+            stats['BaselineN1'] = stats.clicksIpsN1 / stats.impressionsIpsN1
         stats['BaselineR'] = stats.clicksIpsR / stats.impressionsIpsR
         return stats
 
