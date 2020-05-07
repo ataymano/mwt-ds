@@ -16,7 +16,7 @@ class AzureStorage:
     @staticmethod
     def get_latest_app_folder(bbs, container):
         folders = bbs.list_blobs(container, delimiter='/')
-        folder = max([d.name[:-1] for d in filter(lambda d: d.name[-1] == '/', folders)])
+        folder = max([d.name[:-1] for d in filter(lambda d: d.name[-1] == '/' and d.name[0] == '2', folders)])
         return folder
 
     @staticmethod
