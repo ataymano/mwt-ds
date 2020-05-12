@@ -14,7 +14,7 @@ def product(*dimensions):
             lambda tuple: apply(tuple[0], tuple[1]),
             itertools.product(d1, d2)
         ), dimensions)
-    return result
+    return list(result)
 
 
 def dimension(name, values):
@@ -36,7 +36,8 @@ class Grid:
 
 def generate():
     hyper_points = product(
-        dimension('-l', [1e-7, 1e-6, 1e-5]),
+        dimension('-l', [1e-6, 1e-5]),
+        dimension('--cb_type', ['ips', 'mtr']),
     )
 
     return [
