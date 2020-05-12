@@ -15,10 +15,10 @@ class SeqPool:
 
 
 class MultiThreadPool:
-    def __init__(self, procs):
+    def __init__(self, procs=multiprocessing.cpu_count()):
         self.Procs = procs
 
-    def map(self, task, inputs=multiprocessing.cpu_count()):
+    def map(self, task, inputs):
         p = ThreadPool(processes=self.Procs)
         args = [(task, index, input) for index, input in enumerate(inputs)]
         result = p.imap_unordered(execute, args)
