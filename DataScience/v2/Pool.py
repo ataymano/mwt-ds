@@ -18,7 +18,7 @@ class MultiThreadPool:
     def __init__(self, procs):
         self.Procs = procs
 
-    def map(self, task, inputs):
+    def map(self, task, inputs=multiprocessing.cpu_count()):
         p = ThreadPool(processes=self.Procs)
         args = [(task, index, input) for index, input in enumerate(inputs)]
         result = p.imap_unordered(execute, args)
