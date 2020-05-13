@@ -51,6 +51,14 @@ class Vw:
 
         return re.sub(' +', ' ', command)
 
+    def __populate__(self, prefix, opts_in, opts_out):
+        sorted_opts_out = sorted(opts_out)
+        seed = self.__generate_command_line__(opts_in) + '-'.join(sorted_opts_out)
+        result = {}
+        for o in opts_out:
+            result[o] = self.Ws.__make_path__('{0}.{1}'.format(prefix, o), [seed])
+        return result
+
     def __run__(self, command):
         self.Ws.Logger.debug('Executing: {0}'.format(command))
         process = subprocess.Popen(
@@ -67,14 +75,6 @@ class Vw:
     def run(self, opts):
         cmd = self.__generate_command_line__(opts)
         return self.Ws.run(getattr(self, '__run__'), cmd)
-
-    def __populate__(self, prefix, opts_in, opts_out):
-        sorted_opts_out = sorted(opts_out)
-        seed = self.__generate_command_line__(opts_in) + '-'.join(sorted_opts_out)
-        result = {}
-        for o in opts_out:
-            result[o] = self.Ws.__make_path__('{0}.{1}'.format(prefix, o), [seed])
-        return result
 
     def test(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
         if not isinstance(inputs, list):

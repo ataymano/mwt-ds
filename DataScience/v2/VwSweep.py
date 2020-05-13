@@ -15,10 +15,12 @@ class VwSweep:
         self.Pool = pool
         self.Logger = self.Core.Ws.Logger
 
-    def __iteration__(self, points, inputs):
+    def iteration(self, points, inputs, name='NoName'):
         opts = [(inputs, point, ['-f']) for point in points]
-        result = [VwSweepResult(result, opts) for (result, opts) in list(zip(self.Pool.map(self.Core.train, opts), points))]
-        return sorted(result, key=lambda item: item.Loss)
+        raw_results = self.Pool.map(self.Core.train, opts)
+        results = sorted(list(zip(raw_results, points)), key=lambda x: x[0].Loss)
+        return [VwSweepResult(result, opts, '{0}n{1}'.format(name, index)) 
+            for (index, (result, opts)) in enumerate(results)]
 
     def run(self, multi_grid, inputs, base_command={}):
         base = [base_command]
@@ -27,11 +29,9 @@ class VwSweep:
         for grid in multi_grid:
             self.Logger.info('Sweeping params from {0}...'.format(grid.Config.Name))
             points = VwOptsGrid.product(base, grid.Points)
-            ranked = self.__iteration__(points, inputs)
+            ranked = self.iteration(points, inputs, grid.Config.Name)
             promoted = ranked[:min(grid.Config.Promote, len(ranked))]
             output = ranked[:min(grid.Config.Output, len(ranked))]
-            for i, o in enumerate(output):
-                o.Name = '{0}n{1}'.format(grid.Config.Name, i)
             base = list(map(lambda p: p.Opts, promoted))
             result = result + output
         return result
