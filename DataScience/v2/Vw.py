@@ -34,14 +34,16 @@ class Vw:
     @staticmethod
     def __parse_vw_output__(txt):
         result = {}
+        success = False
         for line in txt.split('\n'):
             if '=' in line:
                 index = line.find('=')
                 key = line[0:index].strip()
                 value = line[index + 1:].strip()
                 if key == "average loss":
-                    result[key] = Vw.__safe_to_float__(value, sys.float_info.max)
-        return result
+                    result[key] = Vw.__safe_to_float__(value, None)
+                    success = result[key] is not None
+        return result, success
 
     def __generate_command_line__(self, opts):
         keys = list(opts.keys())
@@ -71,7 +73,12 @@ class Vw:
         )
         error = process.communicate()[1]
         self.Ws.Logger.debug(error)        
-        return Vw.__parse_vw_output__(error)
+        parsed, success = Vw.__parse_vw_output__(error)
+        if not success:
+            self.Ws.Logger.critical('ERROR: {0}'.format(command))
+            self.Ws.Logger.critical(error)
+            raise Exception('Unsuccesful vw execution')
+        return parsed
 
     def run(self, opts):
         cmd = self.__generate_command_line__(opts)
