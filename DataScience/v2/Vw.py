@@ -1,6 +1,7 @@
 import sys
 import subprocess
 import re
+import json
 
 from Core import Workspace, DummyWorkspace
 
@@ -81,6 +82,7 @@ class Vw:
             raise 'inputs should be list of paths'
         populated = [None] * len(inputs)
         for index, inp in enumerate(inputs):
+            self.Ws.Logger.info('Vw.Test: {0}, opts_in: {1}, opts_out: {2}'.format(inp, json.dumps(opts_in), json.dumps(opts_out)))
             current_opts = input_mode(opts_in, inp)
             populated[index] = self.__populate__('Vw.Test-', current_opts, opts_out)
             current_opts = dict(current_opts, **populated[index])
@@ -94,6 +96,7 @@ class Vw:
             opts_out.append('-f')
         populated = [None] * len(inputs)
         for index, inp in enumerate(inputs):
+            self.Ws.Logger.info('Vw.Train: {0}, opts_in: {1}, opts_out: {2}'.format(inp, json.dumps(opts_in), json.dumps(opts_out)))
             current_opts = input_mode(opts_in, inp)
             if index > 0:
                 current_opts['-i'] = populated[index - 1]['-f']
