@@ -84,7 +84,7 @@ class Vw:
         for index, inp in enumerate(inputs):
             self.Ws.Logger.info('Vw.Test: {0}, opts_in: {1}, opts_out: {2}'.format(inp, json.dumps(opts_in), json.dumps(opts_out)))
             current_opts = input_mode(opts_in, inp)
-            populated[index] = self.__populate__('Vw.Test-', current_opts, opts_out)
+            populated[index] = self.__populate__('Vw.Test', current_opts, opts_out)
             current_opts = dict(current_opts, **populated[index])
             result = self.run(current_opts)
         return VwResult(result['average loss'], populated)
@@ -100,7 +100,7 @@ class Vw:
             current_opts = input_mode(opts_in, inp)
             if index > 0:
                 current_opts['-i'] = populated[index - 1]['-f']
-            populated[index] = self.__populate__('Vw.Train-', current_opts, opts_out)
+            populated[index] = self.__populate__('Vw.Train', current_opts, opts_out)
             current_opts = dict(current_opts, **populated[index])
             result = self.run(current_opts)
         return VwResult(result['average loss'], populated)       
