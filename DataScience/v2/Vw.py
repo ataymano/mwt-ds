@@ -4,6 +4,7 @@ import re
 import json
 
 from Core import Workspace, DummyWorkspace
+from Pool import SeqPool, MultiThreadPool
 
 class VwInput:
     @staticmethod
@@ -20,9 +21,10 @@ class VwResult:
         self.Populated = populated
 
 class Vw:
-    def __init__(self, path, workspace = None):
+    def __init__(self, path, workspace = None, pool = MultiThreadPool()):
         self.Path = path
         self.Ws = workspace if workspace else DummyWorkspace()
+        self.Pool = pool
 
     @staticmethod
     def __safe_to_float__(str, default):
@@ -84,7 +86,7 @@ class Vw:
         cmd = self.__generate_command_line__(opts)
         return self.Ws.run(getattr(self, '__run__'), cmd)
 
-    def test(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
+    def __test__(self, inputs, opts_in, opts_out, input_mode):
         if not isinstance(inputs, list):
             raise 'inputs should be list of paths'
         populated = [None] * len(inputs)
@@ -96,7 +98,15 @@ class Vw:
             result = self.run(current_opts)
         return VwResult(result['average loss'], populated)
 
-    def train(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
+    def test(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
+        if not isinstance(inputs, list):
+            raise 'inputs should be list of paths'
+        if isinstance(opts_in, list):
+            args = [(inputs, point, opts_out, input_mode) for point in opts_in]
+            return self.Pool.map(self.__test__, args)            
+        return self.__test__(inputs, opts_in, opts_out, input_mode)
+
+    def __train__(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
         if not isinstance(inputs, list):
             raise 'inputs should be list of paths'
         if '-f' not in opts_out:
@@ -110,4 +120,12 @@ class Vw:
             populated[index] = self.__populate__('Vw.Train', current_opts, opts_out)
             current_opts = dict(current_opts, **populated[index])
             result = self.run(current_opts)
-        return VwResult(result['average loss'], populated)       
+        return VwResult(result['average loss'], populated)     
+
+    def train(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
+        if not isinstance(inputs, list):
+            raise 'inputs should be list of paths'
+        if isinstance(opts_in, list):
+            args = [(inputs, point, opts_out, input_mode) for point in opts_in]
+            return self.Pool.map(self.__train__, args)            
+        return self.__train__(inputs, opts_in, opts_out, input_mode)    
