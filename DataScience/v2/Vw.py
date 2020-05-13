@@ -87,8 +87,6 @@ class Vw:
         return self.Ws.run(getattr(self, '__run__'), cmd)
 
     def __test__(self, inputs, opts_in, opts_out, input_mode):
-        if not isinstance(inputs, list):
-            raise 'inputs should be list of paths'
         populated = [None] * len(inputs)
         for index, inp in enumerate(inputs):
             self.Ws.Logger.info('Vw.Test: {0}, opts_in: {1}, opts_out: {2}'.format(inp, json.dumps(opts_in), json.dumps(opts_out)))
@@ -100,15 +98,13 @@ class Vw:
 
     def test(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
         if not isinstance(inputs, list):
-            raise 'inputs should be list of paths'
+            inputs = [inputs]
         if isinstance(opts_in, list):
             args = [(inputs, point, opts_out, input_mode) for point in opts_in]
             return self.Pool.map(self.__test__, args)            
         return self.__test__(inputs, opts_in, opts_out, input_mode)
 
     def __train__(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
-        if not isinstance(inputs, list):
-            raise 'inputs should be list of paths'
         if '-f' not in opts_out:
             opts_out.append('-f')
         populated = [None] * len(inputs)
@@ -124,7 +120,7 @@ class Vw:
 
     def train(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
         if not isinstance(inputs, list):
-            raise 'inputs should be list of paths'
+            inputs = [inputs]
         if isinstance(opts_in, list):
             args = [(inputs, point, opts_out, input_mode) for point in opts_in]
             return self.Pool.map(self.__train__, args)            
