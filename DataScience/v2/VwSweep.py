@@ -14,8 +14,10 @@ class VwSweep:
         self.Logger = self.Core.Ws.Logger
 
     def iteration(self, points, inputs, name='NoName'):
+        self.Logger.info('Sweeping {0} is started'.format(name))
         raw_results = self.Core.train(inputs, points, ['-f'])
         results = sorted(list(zip(raw_results, points)), key=lambda x: x[0].Loss)
+        self.Logger.info('Sweeping {0} is finished'.format(name))
         return [VwSweepResult(result, opts, '{0}n{1}'.format(name, index)) 
             for (index, (result, opts)) in enumerate(results)]
 
@@ -24,7 +26,6 @@ class VwSweep:
         result = []
         promoted = []
         for grid in multi_grid:
-            self.Logger.info('Sweeping params from {0}...'.format(grid.Config.Name))
             points = VwOptsGrid.product(base, grid.Points)
             ranked = self.iteration(points, inputs, grid.Config.Name)
             promoted = ranked[:min(grid.Config.Promote, len(ranked))]
