@@ -6,6 +6,8 @@ import json
 from Core import Workspace, DummyWorkspace
 from Pool import SeqPool, MultiThreadPool
 
+import multiprocessing
+
 class VwInput:
     @staticmethod
     def cache(opts, i):
@@ -21,10 +23,10 @@ class VwResult:
         self.Populated = populated
 
 class Vw:
-    def __init__(self, path, workspace = None, pool = MultiThreadPool()):
+    def __init__(self, path, workspace=None, procs=multiprocessing.cpu_count()):
         self.Path = path
         self.Ws = workspace if workspace else DummyWorkspace()
-        self.Pool = pool
+        self.Pool = SeqPool() if procs == 1 else MultiThreadPool(procs)
 
     @staticmethod
     def __safe_to_float__(str, default):
