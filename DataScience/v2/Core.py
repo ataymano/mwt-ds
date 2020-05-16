@@ -14,7 +14,7 @@ class Workspace:
         folder_name = os.path.join(self.Path, method)
         os.makedirs(folder_name, exist_ok=True)
         fname_readable = ','.join([str(a) for a in args])
-        fname = hashlib.sha256(fname_readable.encode('utf-8')).hexdigest()
+        fname = hashlib.md5(fname_readable.encode('utf-8')).hexdigest()
         self.Logger.debug('Generating path: ({0},{1})\t{2}'.format(method, fname_readable, fname))
         return os.path.join(folder_name, fname)
 
