@@ -49,13 +49,13 @@ class Vw:
                     success = result[key] is not None
         return result, success
 
-    def __generate_command_line__(self, opts):
-        keys = list(opts.keys())
-        keys.sort()
-        command = '{0} {1}'.format(self.Path,
-                ' '.join(['{0} {1}'.format(key, opts[key]) if not key.startswith('#')
-                else str(opts[key]) for key in keys]))
+    @staticmethod
+    def __to_str__(opts):
+        return ' '.join(['{0} {1}'.format(key, opts[key]) if not key.startswith('#')
+            else str(opts[key]) for key in sorted(opts.keys())])
 
+    def __generate_command_line__(self, opts):
+        command = '{0} {1}'.format(self.Path, Vw.__to_str__(opts))
         return re.sub(' +', ' ', command)
 
     def __populate__(self, prefix, opts_in, opts_out):
