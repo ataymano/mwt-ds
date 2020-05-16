@@ -1,5 +1,5 @@
 import VwOptsGrid
-from Vw import Vw
+from Vw import Vw, VwInput
 
 class VwSweepResult:
     def __init__(self, vw_result, opts, name = None):
@@ -13,9 +13,9 @@ class VwSweep:
         self.Core = vw
         self.Logger = self.Core.Ws.Logger
 
-    def iteration(self, points, inputs, name='NoName'):
+    def iteration(self, points, inputs, name='NoName', input_mode = VwInput.cache):
         self.Logger.info('Sweeping {0} is started'.format(name))
-        raw_results = self.Core.train(inputs, points, ['-f'])
+        raw_results = self.Core.train(inputs, points, ['-f'], input_mode)
         results = sorted(list(zip(raw_results, points)), key=lambda x: x[0].Loss)
         self.Logger.info('Sweeping {0} is finished'.format(name))
         return [VwSweepResult(result, opts, '{0}n{1}'.format(name, index)) 
