@@ -9,19 +9,20 @@ class VwSweepResult:
         self.Name = name
 
 class VwSweep:
-    def __init__(self, vw):
+    def __init__(self, vw, input_mode = VwInput.cache):
         self.Core = vw
         self.Logger = self.Core.Ws.Logger
+        self.InputMode = input_mode
 
-    def iteration(self, points, inputs, name='NoName', input_mode = VwInput.cache):
+    def iteration(self, inputs, points, name='NoName'):
         self.Logger.info('Sweeping {0} is started'.format(name))
-        raw_results = self.Core.train(inputs, points, ['-f'], input_mode)
+        raw_results = self.Core.train(inputs, points, ['-f'], self.InputMode)
         results = sorted(list(zip(raw_results, points)), key=lambda x: x[0].Loss)
         self.Logger.info('Sweeping {0} is finished'.format(name))
         return [VwSweepResult(result, opts, '{0}n{1}'.format(name, index)) 
             for (index, (result, opts)) in enumerate(results)]
 
-    def run(self, multi_grid, inputs, base_command={}):
+    def run(self, inputs, multi_grid, base_command={}):
         base = [base_command]
         result = []
         promoted = []
