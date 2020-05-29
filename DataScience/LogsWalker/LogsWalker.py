@@ -35,6 +35,15 @@ class AppContext(Context):
     def get_instance(self, model=None):
         return InstanceContext(self, model)
 
+    def get_stats(self, start_date, end_date, prefix='statistics', time_column='Timestamp', adls_path='daily'):
+        models = AzureStorage.get_app_folders(self.Parent.Bbs(), self.App)
+        result = []
+        for m in models:
+            stats = self.get_instance(m).get_stats(start_date, end_date)
+            if stats is not None:
+                result.append((m, stats))
+        return result
+
 class InstanceContext(Context):
     def __init__(self, app_context, model=None):
         if not model:
@@ -108,13 +117,13 @@ class PostProcContext(Context):
         all = [self.get(prefix, d) for d in DateTime.range(start_date, end_date)]
         ready = list(filter(lambda s: s.Exists, all))
         paths = [s.FullPath for s in ready]
-        return SlimLogs.dangling_rewards(paths)
+        return None if len(paths) == 0 else SlimLogs.dangling_rewards(paths)
     
     def get_stats(self, start_date, end_date, prefix='statistics', time_column='Timestamp'):
         all = [self.get(prefix, d) for d in DateTime.range(start_date, end_date)]
         ready = list(filter(lambda s: s.Exists, all))
         paths = [s.FullPath for s in ready]
-        return Statistics.read_stats(paths, time_column=time_column)
+        return None if len(paths) == 0 else Statistics.read_stats(paths, time_column=time_column)
 
 
 class PostProcData(Data):

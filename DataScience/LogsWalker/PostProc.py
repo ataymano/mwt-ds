@@ -3,7 +3,13 @@ import pandas as pd
 class Statistics:
     @staticmethod
     def __read_stats__(path, time_column):
-        return pd.read_csv(path, parse_dates=[time_column]).drop(['clicks1', 'impressions1'], axis=1).set_index([time_column])
+        stats = pd.read_csv(path, parse_dates=[time_column]).set_index([time_column])
+        if 'clicksIpsRSlot1' not in stats.columns:
+            stats['clicksIpsRSlot1'] = 0
+        if 'impressionsIpsRSlot1' not in stats.columns:
+            stats['impressionsIpsRSlot1'] = 1
+        return stats
+
 
     @staticmethod
     def read_stats(paths, time_column = 'Timestamp'):
@@ -19,9 +25,13 @@ class Statistics:
     def add_baselines(stats):
         stats['Online'] = stats.clicks / stats.impressions
         stats['Baseline1'] = stats.clicksIps1 / stats.impressionsIps1
+        if 'clicksIps1Slot1' in stats.columns:
+            stats['OnlineSlot1'] = stats.clicks1 / stats.impressions1
+            stats['Baseline1Slot1'] = stats.clicksIps1Slot1 / stats.impressionsIps1Slot1
         if 'clicksIpsN1' in stats.columns:
             stats['BaselineN1'] = stats.clicksIpsN1 / stats.impressionsIpsN1
         stats['BaselineR'] = stats.clicksIpsR / stats.impressionsIpsR
+        stats['BaselineRSlot1'] = stats.clicksIpsRSlot1 / stats.impressionsIpsRSlot1        
         return stats
 
 class SlimLogs:

@@ -14,6 +14,12 @@ def update_progress(current, total):
 
 class AzureStorage:
     @staticmethod
+    def get_app_folders(bbs, container):
+        folders = bbs.list_blobs(container, delimiter='/')
+        folders = sorted([d.name[:-1] for d in filter(lambda d: d.name[-1] == '/' and d.name[0] == '2', folders)])
+        return folders
+
+    @staticmethod
     def get_latest_app_folder(bbs, container):
         folders = bbs.list_blobs(container, delimiter='/')
         folder = max([d.name[:-1] for d in filter(lambda d: d.name[-1] == '/' and d.name[0] == '2', folders)])

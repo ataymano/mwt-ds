@@ -55,11 +55,13 @@ class DsJson:
                  'Timestamp': pd.to_datetime(parsed['Timestamp']),
                  'NumActions': len(parsed['c']['_multi']),
                  'NumSlots': len(parsed['c']['_slots']),
-                 'VWState': parsed['VWState']['m']}
+                 'VWState': parsed['VWState']['m'],
+                 'StringLen': len(line)}
 
         multi = [None] * len(parsed['c']['_multi'])
-   #     for i, o in enumerate(parsed['c']['_multi']):
-   #         multi[i] = {'Id': o['Id']}
+        for i, o in enumerate(parsed['c']['_multi']):
+            multi[i] = {'Id': o['c']['Id'],
+                        'Len': len(json.dumps(o))}
 
         slots = [None] * len(parsed['_outcomes'])
         for i, o in enumerate(parsed['_outcomes']):
@@ -68,7 +70,9 @@ class DsJson:
                     'EventId': o['_id'],
                     'ActionsPerSlot': len(o['_a']),
                     'Chosen': o['_a'][0],
-                    'Prob': o['_p'][0]}
+                    'Prob': o['_p'][0],
+                    'Product': multi[o['_a'][0]]['Id'],
+                    'ChosenActionLen': multi[o['_a'][0]]['Len']}
         
         return session, slots, multi
 
