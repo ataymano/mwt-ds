@@ -81,6 +81,21 @@ class DsJson:
         return [dict(session, **s) for s in slots]
 
     @staticmethod
+    def ccb_action(line):
+        parsed = json.loads(line)
+        session = {'Session': parsed['_outcomes'][0]['_id'], 'Timestamp': pd.to_datetime(parsed['Timestamp'])}
+        multi = [None] * len(parsed['c']['_multi'])
+        for i, o in enumerate(parsed['c']['_multi']):
+            multi[i] = {'Id': o['c']['Id'],
+                        'Action': o,
+                        'SlotIdx': -1,
+                        'Cost': 0}
+        for i, o in enumerate(parsed['_outcomes']):
+            multi[o['_a'][0]]['SlotIdx'] = i
+            multi[o['_a'][0]]['Cost'] = o['_label_cost']
+        return [dict(session, **m) for m in multi]      
+
+    @staticmethod
     def dangling_reward_lines(lines):
         return filter(lambda l: DsJson.is_dangling_reward(l), lines)
 
@@ -98,6 +113,12 @@ class DsJson:
     def ccb_events(lines):
         events = map(lambda l: DsJson.ccb_2_cb(*DsJson.ccb_event(l)), DsJson.ccb_decision_lines(lines))
         df = pd.DataFrame(itertools.chain(*events))
+        return df.set_index('Timestamp')
+
+    @staticmethod
+    def ccb_actions(lines):
+        actions = map(lambda l: DsJson.ccb_action(l), DsJson.ccb_decision_lines(lines))
+        df = pd.DataFrame(itertools.chain(*actions))
         return df.set_index('Timestamp')
 
     @staticmethod

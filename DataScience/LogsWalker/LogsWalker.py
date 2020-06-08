@@ -105,6 +105,14 @@ class DayContext(Context):
                               'Size': '{:.2f} GB'.format(size / (1024 ** 3)),
                               'LastTimestamp': last_ts}])
 
+    def sample(self, start_offset = 0, end_offset = None, bins = 32, size = 128 * 1024 **2):
+        bin_size = int(size / bins)
+        if end_offset is None:
+            end_offset = self.get_size() - bin_size
+        step = int((end_offset - start_offset) / (bins - 1))
+        return [self.get_segment(start_offset + i * step, bin_size) for i in range(0, bins)]
+        
+
 class PostProcContext(Context):
     def __init__(self, instance_context, adls_path):
         super().__init__('postproc', instance_context)
@@ -162,7 +170,7 @@ class DaySegment(Data):
 
     def read(self, previous = None):
         current = previous
-        with open(self.FullPath, 'r', encoding='utf-8') as f:
+        with open(self.FullPath, 'r', encoding='utf-8', errors='ignore') as f:
             first = f.readline()
             if current is not None:
                 current = current + first
