@@ -9,7 +9,7 @@ class VwSweepResult:
         self.Name = name
 
 class VwSweep:
-    def __init__(self, vw, input_mode = VwInput.cache):
+    def __init__(self, vw, input_mode = VwInput.raw):
         self.Core = vw
         self.Logger = self.Core.Ws.Logger
         self.InputMode = input_mode
@@ -28,7 +28,7 @@ class VwSweep:
         promoted = []
         for grid in multi_grid:
             points = VwOptsGrid.product(base, grid.Points)
-            ranked = self.iteration(points, inputs, grid.Config.Name)
+            ranked = self.iteration(inputs, points, grid.Config.Name)
             promoted = ranked[:min(grid.Config.Promote, len(ranked))]
             output = ranked[:min(grid.Config.Output, len(ranked))]
             base = list(map(lambda p: p.Opts, promoted))
