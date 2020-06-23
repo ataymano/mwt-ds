@@ -36,7 +36,7 @@ class AppContext(Context):
         return InstanceContext(self, model)
 
     def get_stats(self, start_date, end_date, prefix='statistics', time_column='Timestamp', adls_path='daily'):
-        models = AzureStorage.get_app_folders(self.Parent.Bbs(), self.App)
+        models = Adls.get_app_folders(self.Parent.Adls(), self.App)
         result = []
         for m in models:
             stats = self.get_instance(m).get_stats(start_date, end_date)

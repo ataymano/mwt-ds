@@ -46,6 +46,9 @@ class Adls:
             log('Cannot download {0}'.format(path_server))
             return False  
 
+    def get_app_folders(adls, app):
+        return list(filter(lambda p : p[0] == '2', [p[p.rindex('/') + 1:] for p in adls.ls('daily/{0}'.format(app))]))
+
 class File:
     @staticmethod
     def find_last_eof(path):
