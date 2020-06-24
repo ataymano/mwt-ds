@@ -60,7 +60,7 @@ class DsJson:
 
         multi = [None] * len(parsed['c']['_multi'])
         for i, o in enumerate(parsed['c']['_multi']):
-            multi[i] = {'Id': o['c']['Id'],
+            multi[i] = {#'Id': o['c']['Id'],
                         'Len': len(json.dumps(o))}
 
         slots = [None] * len(parsed['_outcomes'])
@@ -71,7 +71,7 @@ class DsJson:
                     'ActionsPerSlot': len(o['_a']),
                     'Chosen': o['_a'][0],
                     'Prob': o['_p'][0],
-                    'Product': multi[o['_a'][0]]['Id'],
+                  #  'Product': multi[o['_a'][0]]['Id'],
                     'ChosenActionLen': multi[o['_a'][0]]['Len']}
         
         return session, slots, multi
@@ -86,7 +86,7 @@ class DsJson:
         session = {'Session': parsed['_outcomes'][0]['_id'], 'Timestamp': pd.to_datetime(parsed['Timestamp'])}
         multi = [None] * len(parsed['c']['_multi'])
         for i, o in enumerate(parsed['c']['_multi']):
-            multi[i] = {'Id': o['c']['Id'],
+            multi[i] = {#'Id': o['c']['Id'],
                         'Action': o,
                         'SlotIdx': -1,
                         'Cost': 0}
