@@ -1,5 +1,6 @@
 import VwOptsGrid
 from Vw import Vw, VwInput
+import pandas as pd
 
 class VwSweepResult:
     def __init__(self, vw_result, opts, name = None):
@@ -21,6 +22,30 @@ class VwSweep:
         self.Logger.info('Sweeping {0} is finished'.format(name))
         return [VwSweepResult(result, opts, '{0}n{1}'.format(name, index)) 
             for (index, (result, opts)) in enumerate(results)]
+    
+    def iteration_df(self, inputs, df, name='NoName'):
+        results = self.iteration(inputs, df['Args'].to_list(), name)
+        return pd.DataFrame(map(lambda r: {'Loss': r.Loss, 'Args': r.Opts, 'Name': r.Name, 'Model': r.Model}, results)).sort_values('Loss')
+
+    def predict(self, inputs, points):
+        self.Logger.info('Prediction stage is started')
+        raw_results = self.Core.train(inputs, points, ['-p'], self.InputMode)
+        results = sorted(list(zip(raw_results, points)), key=lambda x: x[0].Loss)
+        self.Logger.info('Prediction stage is finished')
+        return [(result, opts) for (result, opts) in results]
+
+    def predict_df(self, inputs, df):
+        results = self.predict(inputs, df['PredictArgs'].to_list())
+        result = df[['Name', 'PredictArgs']]
+        result['Predictions'] = [[p['-p'] for p in r[0].Populated] for r in results]
+        return result
+
+        self.Logger.info('Predicting {0} is started'.format(name))
+        raw_results = self.Core.train(inputs, points, ['-f'], self.InputMode)
+        results = sorted(list(zip(raw_results, points)), key=lambda x: x[0].Loss)
+        self.Logger.info('Sweeping {0} is finished'.format(name))
+        return [VwSweepResult(result, opts, '{0}n{1}'.format(name, index)) 
+            for (index, (result, opts)) in enumerate(results)]               
 
     def run(self, inputs, multi_grid, base_command={}):
         base = [base_command]
