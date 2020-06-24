@@ -26,7 +26,7 @@ class console_logger:
         if self.level <= logging.CRITICAL: self._trace(message)
 
     def _trace(self, message):
-        prefix = '[' + str(self.node_id) + '][' + time.strftime("%d-%m-%Y %H:%M:%S", time.localtime(time.time())) + ']'
+        prefix = '[' + str(self.node_id) + '][' + time.strftime("%d-%m-%Y %H:%M:%S", time.localtime(time.time())) + '] '
         self.lock.acquire()
         print(prefix + message)
         self.lock.release()
