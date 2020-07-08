@@ -88,7 +88,10 @@ class DayContext(Context):
         return self.Asb.get_size()
 
     def get_segment(self, start, size=None, temporary=False, with_progress=True):
-        return DaySegment(self, start, None if not size else start + size, temporary, with_progress)
+        end = start + size if size else self.get_size()
+        if end <= start:
+            return None
+        return DaySegment(self, start, end, temporary, with_progress)
 
     def lookup(self, hours, minutes, tolerance=datetime.timedelta(minutes=5), offset_limit=64 * 1024 ** 2,
                iterations_limit=10):
@@ -145,8 +148,8 @@ class PostProcData(Data):
 
 class DaySegment(Data):
     def __init__(self, day_context, start_offset, end_offset, temporary=False, with_progress=False):
-        self.StartOffset = start_offset
-        self.EndOffset = end_offset
+        self.StartOffset = int(start_offset)
+        self.EndOffset = int(end_offset)
         self.WithProgress = with_progress
         super().__init__('view.{0}-{1}'.format(start_offset, end_offset), day_context)
         self.__Temporary__ = temporary
@@ -184,6 +187,9 @@ class DaySegment(Data):
 
     def load(self, name):
         return pd.read_csv('{0}.{1}'.format(self.FullPath, name))
+
+    def next(self):
+        return self.Context.get_segment(self.EndOffset, 2 * self.EndOffset - self.StartOffset, temporary, with_progress)
 
 class DayIndex(Data):
     def __init__(self, day_context):

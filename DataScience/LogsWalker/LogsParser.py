@@ -56,7 +56,8 @@ class DsJson:
                  'NumActions': len(parsed['c']['_multi']),
                  'NumSlots': len(parsed['c']['_slots']),
                  'VWState': parsed['VWState']['m'],
-                 'StringLen': len(line)}
+                 'StringLen': len(line),
+                 'Pdrop': 0.0 if 'pdrop' not in parsed else parsed['pdrop']}
 
         multi = [None] * len(parsed['c']['_multi'])
         for i, o in enumerate(parsed['c']['_multi']):
@@ -71,6 +72,7 @@ class DsJson:
                     'ActionsPerSlot': len(o['_a']),
                     'Chosen': o['_a'][0],
                     'Prob': o['_p'][0],
+                    'HasObservation': '_o' in o and len(o['_o']) > 0,
                   #  'Product': multi[o['_a'][0]]['Id'],
                     'ChosenActionLen': multi[o['_a'][0]]['Len']}
         
@@ -79,6 +81,28 @@ class DsJson:
     @staticmethod
     def ccb_2_cb(session, slots, multi):
         return [dict(session, **s) for s in slots]
+
+    @staticmethod
+    def ccb_as_cb_to_stats(df):
+        result = df
+        result['TimestampFloor'] = result.index.floor('5min')
+        result['Observations'] = result['HasObservation'].astype(int).div(1 - result['Pdrop'])
+        result['Rewards'] = -result['Cost'].div(1 - result['Pdrop'])
+        result['Events'] = 1
+        result['EventsLogged'] = result['Events']
+        result['Events'] = result['Events'].div(1 - result['Pdrop'])
+        result['RewardsSlot1'] = result['Rewards'].mul((result['SlotIdx']==0).astype(int))
+        result['EventsSlot1'] = result['Events'].mul((result['SlotIdx']==0).astype(int))
+        result['RewardsIps1'] = result['Rewards'].mul((result['SlotIdx']==result['Chosen']).astype(int)).div(result['Prob'])
+        result['EventsIps1'] = result['Events'].mul((result['SlotIdx']==result['Chosen']).astype(int)).div(result['Prob'])
+        result['RewardsIps1Slot1'] = result['RewardsIps1'].mul((result['SlotIdx']==0).astype(int))
+        result['EventsIps1Slot1'] = result['EventsIps1'].mul((result['SlotIdx']==0).astype(int))
+        result['RewardsIpsR'] = result['Rewards'].mul(result['ActionsPerSlot']).div(result['Prob'])
+        result['EventsIpsR'] = result['Events'].mul(result['ActionsPerSlot']).div(result['Prob'])
+        result['RewardsIpsRSlot1'] = result['RewardsIpsR'].mul((result['SlotIdx']==0).astype(int))
+        result['EventsIpsRSlot1'] = result['EventsIpsR'].mul((result['SlotIdx']==0).astype(int))
+
+        return result[['TimestampFloor', 'Observations', 'Rewards', 'Events', 'RewardsSlot1', 'EventsSlot1', 'RewardsIps1', 'EventsIps1', 'RewardsIps1Slot1', 'EventsIps1Slot1', 'RewardsIpsR', 'EventsIpsR', 'RewardsIpsRSlot1', 'EventsIpsRSlot1', 'EventsLogged']].reset_index().drop('Timestamp', axis=1).rename(columns = {'TimestampFloor': 'Timestamp'}).groupby('Timestamp').sum()
 
     @staticmethod
     def ccb_action(line):
@@ -114,6 +138,12 @@ class DsJson:
         events = map(lambda l: DsJson.ccb_2_cb(*DsJson.ccb_event(l)), DsJson.ccb_decision_lines(lines))
         df = pd.DataFrame(itertools.chain(*events))
         return df.set_index('Timestamp')
+
+    @staticmethod
+    def ccb_stats(lines):
+        events = map(lambda l: DsJson.ccb_2_cb(*DsJson.ccb_event(l)), DsJson.ccb_decision_lines(lines))
+        df = pd.DataFrame(itertools.chain(*events))
+        return DsJson.ccb_as_cb_to_stats(df.set_index('Timestamp'))
 
     @staticmethod
     def ccb_actions(lines):
