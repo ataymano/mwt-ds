@@ -2,6 +2,7 @@ import pandas as pd
 import json
 import uuid
 import itertools
+import pytz
 
 class NaiveJson:
     def __init__(self, line):
@@ -85,7 +86,8 @@ class DsJson:
     @staticmethod
     def ccb_as_cb_to_stats(df):
         result = df
-        result['TimestampFloor'] = result.index.floor('5min')
+        result['TimestampFloor'] = result.index.floor('1min')
+        result['TimestampFloor'] = result['TimestampFloor'].dt.tz_localize(None)
         result['Observations'] = result['HasObservation'].astype(int).div(1 - result['Pdrop'])
         result['Rewards'] = -result['Cost'].div(1 - result['Pdrop'])
         result['Events'] = 1

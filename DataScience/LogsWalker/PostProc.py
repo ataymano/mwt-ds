@@ -23,15 +23,12 @@ class Statistics:
 
     @staticmethod
     def add_baselines(stats):
-        stats['Online'] = stats.clicks / stats.impressions
-        stats['Baseline1'] = stats.clicksIps1 / stats.impressionsIps1
-        if 'clicksIps1Slot1' in stats.columns:
-            stats['OnlineSlot1'] = stats.clicks1 / stats.impressions1
-            stats['Baseline1Slot1'] = stats.clicksIps1Slot1 / stats.impressionsIps1Slot1
-        if 'clicksIpsN1' in stats.columns:
-            stats['BaselineN1'] = stats.clicksIpsN1 / stats.impressionsIpsN1
-        stats['BaselineR'] = stats.clicksIpsR / stats.impressionsIpsR
-        stats['BaselineRSlot1'] = stats.clicksIpsRSlot1 / stats.impressionsIpsRSlot1        
+        stats['Online'] = stats.Rewards / stats.Events
+        stats['OnlineSlot1'] = stats.RewardsSlot1 / stats.EventsSlot1
+        stats['Baseline1'] = stats.RewardsIps1 / stats.EventsIps1         
+        stats['Baseline1Slot1'] = stats.RewardsIps1Slot1 / stats.EventsIps1Slot1
+        stats['BaselineR'] = stats.RewardsIpsR / stats.EventsIpsR         
+        stats['BaselineRSlot1'] = stats.RewardsIpsRSlot1 / stats.EventsIpsRSlot1      
         return stats
 
 class SlimLogs:

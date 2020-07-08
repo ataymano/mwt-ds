@@ -88,7 +88,8 @@ class DayContext(Context):
         return self.Asb.get_size()
 
     def get_segment(self, start, size=None, temporary=False, with_progress=True):
-        end = start + size if size else self.get_size()
+        day_size = self.get_size()
+        end = min(start + size, day_size) if size else day_size
         if end <= start:
             return None
         return DaySegment(self, start, end, temporary, with_progress)
@@ -185,11 +186,14 @@ class DaySegment(Data):
     def save(self, name, dataframe):
         dataframe.to_csv('{0}.{1}'.format(self.FullPath, name))
 
-    def load(self, name):
-        return pd.read_csv('{0}.{1}'.format(self.FullPath, name))
+    def load(self, name, time_column = 'Timestamp'):
+        path = '{0}.{1}'.format(self.FullPath, name)
+        if os.path.exists(path):
+            return pd.read_csv(path, parse_dates=[time_column]).set_index([time_column])
+        return None
 
     def next(self):
-        return self.Context.get_segment(self.EndOffset, 2 * self.EndOffset - self.StartOffset, temporary, with_progress)
+        return self.Context.get_segment(self.EndOffset, self.EndOffset - self.StartOffset, self.__Temporary__, self.WithProgress)
 
 class DayIndex(Data):
     def __init__(self, day_context):
