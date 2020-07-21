@@ -1,6 +1,7 @@
 import os
 import json
-import Logger
+
+from VwPipeline import Logger
 
 class Workspace:
     def __init__(self, path, logger = Logger.console_logger(0, 'INFO'), reset=False):

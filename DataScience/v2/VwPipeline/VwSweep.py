@@ -1,5 +1,5 @@
-import VwOptsGrid
-from Vw import Vw, VwInput
+from VwPipeline import VwOptsGrid
+from VwPipeline.Vw import Vw, VwInput
 import pandas as pd
 
 class VwSweepResult:
