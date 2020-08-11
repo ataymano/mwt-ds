@@ -87,29 +87,47 @@ class Vw:
         run -- Run object to capture logging.
         out_lines -- List of output lines from Vowpal Wabbit.
         '''
+        metrics = {}
+        loss = None
         for line in out_lines:
             line = line.strip()
             if '=' in line:
                 keyval = line.split('=')
                 key = keyval[0].strip()
                 val = keyval[1].strip()
+                metrics[key] = val
                 if key == 'average loss':
                     # Include the final loss as the primary metric
-                    return Vw.__safe_to_float__(val, None)
+                    loss = Vw.__safe_to_float__(val, None)
+        return metrics, loss
 
     @staticmethod
     def __parse_vw_output__(txt):
         success = False
         lines = txt.split('\n')
         average_loss, since_last = Vw.__get_loss_per_example__(lines)
-        loss = Vw.__get_final_metrics__(lines)
+        metrics, loss = Vw.__get_final_metrics__(lines)
         success = loss is not None
-        return {'loss_per_example': average_loss, 'since_last': since_last, 'loss': loss}, success
+        return {'loss_per_example': average_loss, 'since_last': since_last, 'metrics': metrics, 'loss': loss}, success
+
+    @staticmethod
+    def __filter_cmd__(line, options):
+        result = ''
+        for o in options:
+            if o in line:
+                result = result + f'{o} '
+        return result.strip()
 
     @staticmethod
     def __to_str__(opts):
         return ' '.join(['{0} {1}'.format(key, opts[key]) if not key.startswith('#')
             else str(opts[key]) for key in sorted(opts.keys())])
+
+    @staticmethod
+    def __normalize__(cmd):
+        items = [i.strip() for i in cmd.split('-')]
+        items.sort()
+        return ' '.join(items).strip()
 
     def __generate_command_line__(self, opts):
         command = '{0} {1}'.format(self.Path, Vw.__to_str__(opts))
@@ -120,7 +138,7 @@ class Vw:
         seed = self.__generate_command_line__(opts_in) + '-'.join(sorted_opts_out)
         result = {}
         for o in opts_out:
-            result[o] = self.Ws.__make_path__('{0}.{1}'.format(prefix, o), [seed])
+            result[o] = self.Ws.__make_path__('{0}.{1}'.format(prefix, o), Workspace.__default_hash__([seed]))
         return result
 
     def __run__(self, command):
@@ -143,7 +161,7 @@ class Vw:
 
     def run(self, opts):
         cmd = self.__generate_command_line__(opts)
-        return self.Ws.run(getattr(self, '__run__'), cmd)
+        return self.Ws.run(getattr(self, '__run__'), cmd, hash=Vw.__normalize__)
 
     def __test__(self, inputs, opts_in, opts_out, input_mode):
         populated = [None] * len(inputs)

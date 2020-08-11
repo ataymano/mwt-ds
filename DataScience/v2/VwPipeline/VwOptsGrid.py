@@ -43,4 +43,3 @@ def generate():
     return [
         Grid(hyper_points, Configuration(name='hyper1', output=2, promote=1)),
     ]
-

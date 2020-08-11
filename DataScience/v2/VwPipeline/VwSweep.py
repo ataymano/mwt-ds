@@ -4,7 +4,7 @@ import pandas as pd
 
 class VwSweepResult:
     def __init__(self, vw_result, opts, name = None):
-        self.Loss = vw_result.Loss
+        self.Result = vw_result
         self.Opts = opts
         self.Model = vw_result.Populated[-1]['-f']
         self.Name = name
@@ -25,7 +25,7 @@ class VwSweep:
     
     def iteration_df(self, inputs, df, name='NoName'):
         results = self.iteration(inputs, df['Args'].to_list(), name)
-        return pd.DataFrame(map(lambda r: {'Loss': r.Loss, 'Args': r.Opts, 'Name': r.Name, 'Model': r.Model}, results)).sort_values('Loss')
+        return pd.DataFrame(map(lambda r: {'Loss': r.Result.Loss, 'Args': r.Opts, 'Name': r.Name, 'Model': r.Model}, results)).sort_values('Loss')
 
     def predict(self, inputs, points):
         self.Logger.info('Prediction stage is started')
