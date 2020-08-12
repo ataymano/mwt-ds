@@ -45,6 +45,65 @@ class TestToString(unittest.TestCase):
                                 '--cb_type': 'mtr'}),
             '--ccb_explore_adf --epsilon 0.1 --dsjson --cb_type mtr --l 0.1')
 
+class TestDimension(unittest.TestCase):
+    def test_dimension(self):
+        self.assertEqual(
+            VwOpts.dimension('-o', []),
+            [])
+
+        self.assertEqual(
+            VwOpts.dimension('-o', [1, 2, 3]),
+            [{'-o': '1'}, {'-o': '2'}, {'-o': '3'}])
+
+        self.assertEqual(
+            VwOpts.dimension('-o', ['value1', 'value2', 'value3']),
+            [{'-o': 'value1'}, {'-o': 'value2'}, {'-o': 'value3'}])
+
+class TestProduct(unittest.TestCase):
+    def test_product(self):
+        self.assertEqual(
+            VwOpts.product(
+                VwOpts.dimension('-o1', []),
+                VwOpts.dimension('-o2', [])
+            ),
+            [])
+
+        self.assertEqual(
+            VwOpts.product(
+                VwOpts.dimension('-o1', [1, 2, 3]),
+                VwOpts.dimension('-o2', [])
+            ),
+            [])
+
+        self.assertEqual(
+            VwOpts.product(
+                VwOpts.dimension('-o1', []),
+                VwOpts.dimension('-o2', [1, 2, 3])
+            ),
+            [])
+
+        self.assertEqual(
+            VwOpts.product(
+                VwOpts.dimension('-o1', [1, 2, 3]),
+                [{}]
+            ),
+            VwOpts.dimension('-o1', [1, 2, 3]))
+
+        self.assertEqual(
+            VwOpts.product(
+                [{}],
+                VwOpts.dimension('-o2', [1, 2, 3])
+            ),
+            VwOpts.dimension('-o2', [1, 2, 3]))
+
+        self.assertEqual(
+            VwOpts.product(
+                VwOpts.dimension('-o1', [1, 2]),
+                VwOpts.dimension('-o2', [1, 2])
+            ),
+            [{'-o1': '1', '-o2': '1'}, {'-o1': '1', '-o2': '2'}, {'-o1': '2', '-o2': '1'}, {'-o1': '2', '-o2': '2'}])
+           
+
 if __name__ == '__main__':
     unittest.main()
 
