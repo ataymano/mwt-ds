@@ -1,7 +1,4 @@
 import os
-import json
-
-import VwOpts
 
 class VwCache:
     def __init__(self, path: str, create=True):
@@ -20,6 +17,7 @@ class VwCache:
         return os.path.join(folder_name, VwCache.__file_name__(args_hash))
 
     def get_path(self, opts_in: dict, opt_out: str = None) -> str:
+        import VwOpts
         args_hash = VwOpts.string_hash(VwOpts.to_string(opts_in))
         return self.__make_path__(f'populate-{opt_out}', args_hash)
 
