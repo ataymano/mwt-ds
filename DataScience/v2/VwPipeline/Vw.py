@@ -6,6 +6,7 @@ import json
 from VwPipeline.Core import Workspace
 from VwPipeline.Pool import SeqPool, MultiThreadPool
 from VwPipeline import VwOpts
+from VwPipeline import Logger
 
 import multiprocessing
 
@@ -111,6 +112,7 @@ class Vw:
     def __init__(self, path, workspace, procs=multiprocessing.cpu_count()):
         self.Path = path
         self.Ws = workspace
+        self.Logger = self.Ws.Logger
         self.Pool = SeqPool() if procs == 1 else MultiThreadPool(procs)
 
     def __generate_command_line__(self, opts):
@@ -118,7 +120,7 @@ class Vw:
 
     def __run__(self, opts: dict):
         command = self.__generate_command_line__(opts)
-        self.Ws.Logger.debug('Executing: {0}'.format(command))
+        Logger.debug(self.Logger, f'Executing: {command}')
         process = subprocess.Popen(
             command.split(),
             universal_newlines=True,
@@ -127,22 +129,18 @@ class Vw:
             stderr=subprocess.PIPE
         )
         error = process.communicate()[1]
-        self.Ws.Logger.debug(error)        
+        Logger.debug(self.Logger, error)        
         parsed, success = __parse_vw_output__(error)
         if not success:
-            self.Ws.Logger.critical('ERROR: {0}'.format(command))
-            self.Ws.Logger.critical(error)
+            Logger.critical(self.Logger, f'ERROR: {command}')
+            Logger.critical(self.Logger, error)
             raise Exception('Unsuccesful vw execution')
         return parsed
-
-    def run(self, opts):
-        cmd = self.__generate_command_line__(opts)
-        return self.Ws.run(getattr(self, '__run__'), cmd, hash=Vw.__normalize__)
 
     def __test__(self, inputs, opts_in, opts_out, input_mode):
         opts_populated = [None] * len(inputs)
         for index, inp in enumerate(inputs):
-            self.Ws.Logger.info('Vw.Test: {0}, opts_in: {1}, opts_out: {2}'.format(inp, json.dumps(opts_in), json.dumps(opts_out)))
+            Logger.info(self.Logger, f'Vw.Test: {inp}, opts_in: {json.dumps(opts_in)}, opts_out: {json.dumps(opts_out)}')
             current_opts = input_mode(opts_in, inp)
             result, populated = self.Ws.run(self, current_opts, opts_out)
             opts_populated[index] = populated
@@ -161,7 +159,7 @@ class Vw:
             opts_out.append('-f')
         opts_populated = [None] * len(inputs)
         for index, inp in enumerate(inputs):
-            self.Ws.Logger.info(f'Vw.Train: {inp}, opts_in: {VwOpts.to_string(opts_in)}, opts_out: {2}'.format(inp, json.dumps(opts_in), json.dumps(opts_out)))
+            Logger.info(self.Logger, f'Vw.Train: {inp}, opts_in: {json.dumps(opts_in)}, opts_out: {json.dumps(opts_out)}')
             current_opts = input_mode(opts_in, inp)
             if index > 0:
                 current_opts['-i'] = opts_populated[index - 1]['-f']
