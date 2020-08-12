@@ -2,8 +2,8 @@ import sys
 import subprocess
 import re
 import json
+import os
 
-from VwPipeline.Core import Workspace
 from VwPipeline.Pool import SeqPool, MultiThreadPool
 from VwPipeline import VwOpts
 from VwPipeline import Logger
@@ -93,6 +93,14 @@ def __filter_cmd__(line, options):
             result = result + f'{o} '
     return result.strip()
 
+def __save__(obj, path):
+    with open(path, 'w') as f:
+        json.dump(obj, f)
+
+def __load__(path):
+    with open(path, 'r') as f:
+        return json.load(f)
+
 class VwInput:
     @staticmethod
     def cache(opts, i):
@@ -109,11 +117,13 @@ class VwResult:
         self.Metrics = metrics
 
 class Vw:
-    def __init__(self, path, workspace, procs=multiprocessing.cpu_count()):
+    def __init__(self, path, cache, procs=multiprocessing.cpu_count(), reset=False, norun=False):
         self.Path = path
-        self.Ws = workspace
-        self.Logger = self.Ws.Logger
+        self.Cache = cache
+        self.Logger = self.Cache.Logger
         self.Pool = SeqPool() if procs == 1 else MultiThreadPool(procs)
+        self.Reset = reset
+        self.NoRun = norun
 
     def __generate_command_line__(self, opts):
         return f'{self.Path} {VwOpts.to_string(opts)}'
@@ -137,12 +147,33 @@ class Vw:
             raise Exception('Unsuccesful vw execution')
         return parsed
 
+    def run(self, opts_in: dict, opts_out: list):
+        populated = {o: self.Cache.get_path(opts_in, o) for o in opts_out}
+        metrics_path = self.Cache.get_path(opts_in)
+
+        result_files = list(populated.values()) + [metrics_path]
+        not_exist = next((p for p in result_files if not os.path.exists(p)), None)
+
+        opts = dict(opts_in, **populated)
+
+        if self.Reset or not_exist:
+            if not_exist:
+                Logger.debug(self.Logger, f'{not_exist} had not been found.')
+            if self.NoRun:
+                raise 'Result is not found, and execution is deprecated'  
+
+            result = self.__run__(opts)
+            __save__(result, metrics_path)                          
+        else:
+            Logger.debug(self.Logger, f'Result of vw execution is found: {VwOpts.to_string(opts)}')
+        return __load__(metrics_path), populated
+
     def __test__(self, inputs, opts_in, opts_out, input_mode):
         opts_populated = [None] * len(inputs)
         for index, inp in enumerate(inputs):
             Logger.info(self.Logger, f'Vw.Test: {inp}, opts_in: {json.dumps(opts_in)}, opts_out: {json.dumps(opts_out)}')
             current_opts = input_mode(opts_in, inp)
-            result, populated = self.Ws.run(self, current_opts, opts_out)
+            result, populated = self.run(current_opts, opts_out)
             opts_populated[index] = populated
         return VwResult(result['loss'], opts_populated, result)
 
@@ -163,7 +194,7 @@ class Vw:
             current_opts = input_mode(opts_in, inp)
             if index > 0:
                 current_opts['-i'] = opts_populated[index - 1]['-f']
-            result, populated = self.Ws.run(self, current_opts, opts_out)
+            result, populated = self.run(current_opts, opts_out)
             opts_populated[index] = populated
         return VwResult(result['loss'], opts_populated, result)     
 
