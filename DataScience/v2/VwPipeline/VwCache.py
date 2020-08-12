@@ -1,8 +1,11 @@
 import os
 
+from VwPipeline import Logger
+
 class VwCache:
-    def __init__(self, path: str, create=True):
+    def __init__(self, path: str, logger = None, create: bool = True):
         self.Path = path
+        self.Logger = logger
         if create:
             os.makedirs(self.Path, exist_ok=True)
 
@@ -11,15 +14,18 @@ class VwCache:
         import hashlib
         return hashlib.md5(string_hash.encode('utf-8')).hexdigest()
 
-    def __make_path__(self, context: str, args_hash: str) -> str:
+    def __get_path__(self, context: str, args_hash: str) -> str:
         folder_name = os.path.join(self.Path, context)
         os.makedirs(folder_name, exist_ok=True)
         return os.path.join(folder_name, VwCache.__file_name__(args_hash))
 
     def get_path(self, opts_in: dict, opt_out: str = None) -> str:
-        import VwOpts
-        args_hash = VwOpts.string_hash(VwOpts.to_string(opts_in))
-        return self.__make_path__(f'populate-{opt_out}', args_hash)
+        from VwPipeline import VwOpts
+        opts = VwOpts.to_string(opts_in)
+        args_hash = VwOpts.string_hash(opts)
+        result = self.__get_path__(f'cache{opt_out}', args_hash)
+        Logger.debug(self.Logger, f'Generating path for opts_in: {VwOpts.to_string(opts_in)}, opt_out: {opt_out}. Result: {result}')
+        return result
 
     
 

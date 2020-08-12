@@ -2,23 +2,15 @@ import os
 import json
 
 from VwPipeline import Logger
+from VwPipeline.VwCache import VwCache
+from VwPipeline import VwOpts
 
 class Workspace:
-    def __init__(self, path, logger = Logger.console_logger(0, 'INFO'), reset=False, norun=False):
-        self.Path = path
+    def __init__(self, cache, reset=False, norun=False):
+        self.Cache = cache
         self.Reset = reset
-        self.Logger = logger
+        self.Logger = cache.Logger
         self.NoRun = norun
-        os.makedirs(self.Path, exist_ok=True)
-
-    def __make_path__(self, method, args_hash):
-        import hashlib
-        folder_name = os.path.join(self.Path, method)
-        os.makedirs(folder_name, exist_ok=True)
-        
-        fname = hashlib.md5(args_hash.encode('utf-8')).hexdigest()
-        self.Logger.debug('Generating path: ({0},{1})\t{2}'.format(method, args_hash, fname))
-        return os.path.join(folder_name, fname)
 
     @staticmethod
     def __save__(obj, path):
@@ -30,39 +22,23 @@ class Workspace:
         with open(path, 'r') as f:
             return json.load(f)
 
-    @staticmethod
-    def __default_hash__(args):
-        return ','.join([str(a) for a in args])
+    def run(self, vw, opts_in: dict, opts_out: list):
+        populated = {o: self.Cache.get_path(opts_in, o) for o in opts_out}
+        metrics_path = self.Cache.get_path(opts_in)
 
-    def run(self, method, *args, **kwargs):
-        args_hash = kwargs['hash'](*args) if 'hash' in kwargs else Workspace.__default_hash__(args)
-        path = self.__make_path__(method.__name__, args_hash)  
-        
-        if self.Reset or not os.path.exists(path):
-            if not self.NoRun:
-                self.Logger.debug('Executing {0}...'.format(method.__name__))
-                result = method(*args)
-                Workspace.__save__(result, path)
-            else:
-                raise 'Result is not found, and execution is deprecated'
+        result_files = list(populated.values()) + [metrics_path]
+        not_exist = next((p for p in result_files if not os.path.exists(p)), None)
+
+        opts = dict(opts_in, **populated)
+
+        if self.Reset or not_exist:
+            if not_exist:
+                Logger.debug(self.Logger, f'{not_exist} had not been found.')
+            if self.NoRun:
+                raise 'Result is not found, and execution is deprecated'  
+
+            result = vw.__run__(opts)
+            Workspace.__save__(result, metrics_path)                          
         else:
-            self.Logger.debug('Result of {0} is found'.format(method.__name__))
-        return Workspace.__load__(path)
-
-class DummyWorkspace:
-    def __init__(self, logger = Logger.console_logger(0, 'INFO')):
-        self.Logger = logger
-
-    def run(self, method, *args):
-        return method(*args)
-
-    def log(self, *args):
-        print(*args)
-
-    def __make_path__(self, method, args):
-        raise 'Not supported. Please use real workspace'
-
-
-
-
-
+            Logger.debug(self.Logger, f'Result of vw execution is found: {VwOpts.to_string(opts)}')
+        return Workspace.__load__(metrics_path), populated

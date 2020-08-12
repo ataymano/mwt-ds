@@ -29,3 +29,23 @@ class console_logger:
         self.lock.acquire()
         print(prefix + message)
         self.lock.release()
+
+def debug(logger, message: str):
+    if logger:
+        logger.debug(message)
+
+def info(logger, message: str):
+    if logger:
+        logger.info(message)
+
+def warning(logger, message: str):
+    if logger:
+        logger.warning(message)
+
+def error(logger, message: str):
+    if logger:
+        logger.error(message)
+
+def critical(logger, message: str):
+    if logger:
+        logger.critical(message)
