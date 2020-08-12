@@ -1,5 +1,5 @@
 import unittest
-import VwOpts
+from VwPipeline import VwOpts
 
 class TestStringHash(unittest.TestCase):
     def test_equal_after_normalize(self):
@@ -103,6 +103,22 @@ class TestProduct(unittest.TestCase):
             ),
             [{'-o1': '1', '-o2': '1'}, {'-o1': '1', '-o2': '2'}, {'-o1': '2', '-o2': '1'}, {'-o1': '2', '-o2': '2'}])
            
+class TestCacheCmd(unittest.TestCase):
+    def test_cache_cmd_generation(self):
+        self.assertEqual(
+            VwOpts.to_cache_cmd({'#base': '--ccb_explore_adf --epsilon 0.1 --dsjson'}),
+            '--ccb_explore_adf --dsjson')
+
+        self.assertEqual(
+            VwOpts.to_cache_cmd({'#base': '--ccb_explore_adf --epsilon 0.1 --dsjson',
+                                '-b': 20}),
+            '--ccb_explore_adf --dsjson -b 20')
+
+        self.assertEqual(
+            VwOpts.to_cache_cmd({'#base': '--compressed --cb_explore_adf --epsilon 0.1',
+                                '--bit_precision': 20,
+                                '--cb_type': 'mtr'}),
+            '--cb_explore_adf --compressed -b 20')
 
 if __name__ == '__main__':
     unittest.main()

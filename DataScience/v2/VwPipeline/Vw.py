@@ -86,13 +86,6 @@ def __parse_vw_output__(txt):
     success = loss is not None
     return {'loss_per_example': average_loss, 'since_last': since_last, 'metrics': metrics, 'loss': loss}, success
 
-def __filter_cmd__(line, options):
-    result = ''
-    for o in options:
-        if o in line:
-            result = result + f'{o} '
-    return result.strip()
-
 def __save__(obj, path):
     with open(path, 'w') as f:
         json.dump(obj, f)

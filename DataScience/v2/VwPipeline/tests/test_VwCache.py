@@ -1,5 +1,5 @@
 import unittest
-from VwCache import VwCache
+from VwPipeline.VwCache import VwCache
 
 class TestVwCache(unittest.TestCase):
     def test_equal_path_for_equal_options(self):
