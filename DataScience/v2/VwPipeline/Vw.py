@@ -197,4 +197,9 @@ class Vw:
         if isinstance(opts_in, list):
             args = [(inputs, point, opts_out, input_mode) for point in opts_in]
             return self.Pool.map(self.__train__, args)            
-        return self.__train__(inputs, opts_in, opts_out, input_mode)    
+        return self.__train__(inputs, opts_in, opts_out, input_mode)   
+
+    def cache(self, inputs, opts):
+        if not isinstance(inputs, list):
+            inputs = [inputs]
+        return self.test(inputs, {'#cmd': VwOpts.to_cache_cmd(opts)}, ['--cache_file'])
