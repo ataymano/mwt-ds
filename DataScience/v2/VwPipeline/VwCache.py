@@ -3,11 +3,10 @@ import os
 from VwPipeline import Logger
 
 class VwCache:
-    def __init__(self, path: str, logger = None, create: bool = True):
+    def __init__(self, path: str, logger = None):
         self.Path = path
         self.Logger = logger
-        if create:
-            os.makedirs(self.Path, exist_ok=True)
+        os.makedirs(self.Path, exist_ok=True)
 
     @staticmethod
     def __file_name__(string_hash: str) -> str:

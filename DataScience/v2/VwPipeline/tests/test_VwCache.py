@@ -7,7 +7,7 @@ class TestVwCache(unittest.TestCase):
         opts2 = {'#blabla': '--dsjson --ccb_explore_adf',
                 '--epsilon': 0.1,
                 '-d': 'file.txt'}
-        cache = VwCache('test_folder', create=False)
+        cache = VwCache('test_folder')
 
         self.assertEqual(
             cache.get_path(opts1),
@@ -18,7 +18,7 @@ class TestVwCache(unittest.TestCase):
         opts2 = {'#blabla': '--ccb_explore_adf',
                 '--epsilon': 0.1,
                 '-d': 'file.txt'}
-        cache = VwCache('test_folder', create=False)
+        cache = VwCache('test_folder')
 
         self.assertNotEqual(
             cache.get_path(opts1),
