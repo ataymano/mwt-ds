@@ -26,7 +26,3 @@ class VwCache:
         result = self.__get_path__(f'cache{opt_out}', args_hash)
         Logger.debug(self.Logger, f'Generating path for opts_in: {VwOpts.to_string(opts_in)}, opt_out: {opt_out}. Result: {result}')
         return result
-
-    
-
-

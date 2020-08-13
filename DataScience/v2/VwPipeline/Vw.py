@@ -191,7 +191,7 @@ class Vw:
             opts_populated[index] = populated
         return VwResult(result['loss'], opts_populated, result)     
 
-    def train(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
+    def train(self, inputs, opts_in, opts_out=[], input_mode=VwInput.raw):
         if not isinstance(inputs, list):
             inputs = [inputs]
         if isinstance(opts_in, list):
