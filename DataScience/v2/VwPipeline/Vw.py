@@ -48,6 +48,7 @@ def __extract_metrics__(out_lines):
 
 def __parse_vw_output__(txt):
     average_loss, since_last, metrics = __extract_metrics__(txt.split('\n'))
+    loss = None
     if 'average loss' in metrics:
         # Include the final loss as the primary metric
         loss = __safe_to_float__(metrics['average loss'], None)
