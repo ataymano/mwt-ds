@@ -16,12 +16,16 @@ def __safe_to_float__(str, default):
     except (ValueError, TypeError):
         return default
 
-# Helper function to extract example counter lines from VW output.
-# These lines are preceeded by a single line containing the text:
+# Helper function to extract example counters and metrics from VW output.
+# Counter lines are preceeded by a single line containing the text:
 #   loss     last          counter         weight    label  predict features
 # and followed by a blank line
-def __extract_counter_lines__(out_lines):
-    counter_lines = []
+# Metric lines have the following form:
+# metric_name = metric_value
+def __extract_metrics__(out_lines):
+    average_loss_dict = {}
+    since_last_dict = {}
+    metrics = {}
     record = False
     for line in out_lines:
         line = line.strip()
@@ -29,70 +33,35 @@ def __extract_counter_lines__(out_lines):
             if line == '':
                 record = False
             else:
-                counter_lines.append(line.split())
-        else:
-            if line.startswith('loss'):
+                counter_line = line.split()
+                count, average_loss, since_last = counter_line[2], counter_line[0], counter_line[1]
+                average_loss_dict[count] = average_loss
+                since_last_dict[count] = since_last
+        elif line.startswith('loss'):
                 fields = line.split()
                 if fields[0] == 'loss' and fields[1] == 'last' and fields[2] == 'counter':
-                    record = True     
-    return counter_lines
-
-# Scan VW output for a table of average loss value per example and log
-def __get_loss_per_example__(out_lines):
-    average_loss_dict = {}
-    since_last_dict = {}
-    '''Parse Vowpal Wabbit output, looking for a table of average loss scores, organized by numbers of examples.
-    Logs these to the given run as a table row.
-    
-    Arguments:
-    run -- Run object to capture logging.
-    out_lines -- List of output lines from Vowpal Wabbit.
-    '''
-    counter_lines = __extract_counter_lines__(out_lines)
-    for counter_line in counter_lines:
-        count, average_loss, since_last = counter_line[2], counter_line[0], counter_line[1]
-        average_loss_dict[count] = average_loss
-        since_last_dict[count] = since_last
-    return average_loss_dict, since_last_dict
-
-def __get_final_metrics__(out_lines):
-    '''Parse Vowpal Wabbit output, logging any detected metrics to the given Run.
-    Looks for text of the form 'metric = value' and logs.
-    Treats the metric 'average loss' specially, logging as 'loss' since this is used as a primary metric for Hyperdrive.
-    
-    Arguments:
-    run -- Run object to capture logging.
-    out_lines -- List of output lines from Vowpal Wabbit.
-    '''
-    metrics = {}
-    loss = None
-    for line in out_lines:
-        line = line.strip()
-        if '=' in line:
-            keyval = line.split('=')
-            key = keyval[0].strip()
-            val = keyval[1].strip()
-            metrics[key] = val
-            if key == 'average loss':
-                # Include the final loss as the primary metric
-                loss = __safe_to_float__(val, None)
-    return metrics, loss
+                    record = True    
+        elif '=' in line:
+            key_value = [p.strip() for p in line.split('=')]
+            metrics[key_value[0]] = key_value[1]
+    return average_loss_dict, since_last_dict, metrics
 
 def __parse_vw_output__(txt):
-    success = False
-    lines = txt.split('\n')
-    average_loss, since_last = __get_loss_per_example__(lines)
-    metrics, loss = __get_final_metrics__(lines)
+    average_loss, since_last, metrics = __extract_metrics__(txt.split('\n'))
+    if 'average loss' in metrics:
+        # Include the final loss as the primary metric
+        loss = __safe_to_float__(metrics['average loss'], None)
+
     success = loss is not None
     return {'loss_per_example': average_loss, 'since_last': since_last, 'metrics': metrics, 'loss': loss}, success
 
-def __save__(obj, path):
+def __save__(txt, path):
     with open(path, 'w') as f:
-        json.dump(obj, f)
+        f.write(txt)
 
 def __load__(path):
     with open(path, 'r') as f:
-        return json.load(f)
+        return f.read()
 
 class VwInput:
     @staticmethod
@@ -132,13 +101,7 @@ class Vw:
             stderr=subprocess.PIPE
         )
         error = process.communicate()[1]
-        Logger.debug(self.Logger, error)        
-        parsed, success = __parse_vw_output__(error)
-        if not success:
-            Logger.critical(self.Logger, f'ERROR: {command}')
-            Logger.critical(self.Logger, error)
-            raise Exception('Unsuccesful vw execution')
-        return parsed
+        return error
 
     def run(self, opts_in: dict, opts_out: list):
         populated = {o: self.Cache.get_path(opts_in, o) for o in opts_out}
@@ -159,16 +122,25 @@ class Vw:
             __save__(result, metrics_path)                          
         else:
             Logger.debug(self.Logger, f'Result of vw execution is found: {VwOpts.to_string(opts)}')
-        return __load__(metrics_path), populated
+        raw_result = __load__(metrics_path)
+        Logger.debug(self.Logger, raw_result)        
+        parsed, success = __parse_vw_output__(raw_result)
+        if not success:
+            Logger.critical(self.Logger, f'ERROR: {json.dumps(opts)}')
+            Logger.critical(self.Logger, raw_result)
+            raise Exception('Unsuccesful vw execution')
+        return parsed, populated
 
     def __test__(self, inputs, opts_in, opts_out, input_mode):
         opts_populated = [None] * len(inputs)
+        metrics = [None] * len(inputs)
         for index, inp in enumerate(inputs):
             Logger.info(self.Logger, f'Vw.Test: {inp}, opts_in: {json.dumps(opts_in)}, opts_out: {json.dumps(opts_out)}')
             current_opts = input_mode(opts_in, inp)
             result, populated = self.run(current_opts, opts_out)
             opts_populated[index] = populated
-        return VwResult(result['loss'], opts_populated, result)
+            metrics[index] = result
+        return VwResult(result['loss'], opts_populated, metrics)
 
     def test(self, inputs, opts_in, opts_out, input_mode=VwInput.raw):
         if not isinstance(inputs, list):
@@ -182,6 +154,7 @@ class Vw:
         if '-f' not in opts_out:
             opts_out.append('-f')
         opts_populated = [None] * len(inputs)
+        metrics = [None] * len(inputs)
         for index, inp in enumerate(inputs):
             Logger.info(self.Logger, f'Vw.Train: {inp}, opts_in: {json.dumps(opts_in)}, opts_out: {json.dumps(opts_out)}')
             current_opts = input_mode(opts_in, inp)
@@ -189,7 +162,8 @@ class Vw:
                 current_opts['-i'] = opts_populated[index - 1]['-f']
             result, populated = self.run(current_opts, opts_out)
             opts_populated[index] = populated
-        return VwResult(result['loss'], opts_populated, result)     
+            metrics[index] = result
+        return VwResult(result['loss'], opts_populated, metrics)     
 
     def train(self, inputs, opts_in, opts_out=[], input_mode=VwInput.raw):
         if not isinstance(inputs, list):
