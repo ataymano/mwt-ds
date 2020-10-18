@@ -5,6 +5,8 @@ import json
 import pandas as pd
 import multiprocessing
 
+from LogsExplorer import Core
+
 def __add_path__(subtree, parts, last_modified):
     if len(parts) == 1:
         subtree[parts[0]] = last_modified
@@ -37,7 +39,7 @@ def get_files(tree, path:list=[], prefix='', full_path=False, recursive=False):
     result = [k if not full_path else '/'.join(path+[k]) for k in cur if isinstance(cur[k], datetime.datetime) and k.startswith(prefix)]
     if recursive:
         for f in get_folders(tree, path, full_path):
-            result = result + self.get_files(tree, path + f, full_path)  
+            result = result + get_files(tree, path + f, full_path)  
     return result
 
 def get_last_modified(tree, path:list=[]):
@@ -56,28 +58,17 @@ class Container:
     def refresh(self, prefix=''):
         self.__tree__ = get_file_tree([(b['name'], b['last_modified']) for b in self.__impl__.list_blobs(name_starts_with=prefix)])
 
-    def __load_last_modified__(self, local_path):
-        meta_path = f'{local_path}.lm'
-        if not os.path.exists(meta_path):
-            return None
-        meta = pd.to_datetime(open(meta_path, 'r').read())
-        return meta if isinstance(meta, datetime.datetime) else None
-    
-    def __save_last_modified__(self, last_modified, local_path):
-        with open(f'{local_path}.lm','w') as f:
-            f.write(str(last_modified))
-
     def __download__(self, path, local_path, max_concurrency=multiprocessing.cpu_count()):
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
         self.__impl__.download_blob(path).download_to_stream(open(local_path, "wb"), max_concurrency=max_concurrency)
         return True
 
     def __sync__(self, path, local_path, last_modified=None, max_concurrency=multiprocessing.cpu_count()):
-        lm_local = self.__load_last_modified__(local_path)
+        lm_local = Core.load_last_modified(local_path)
         lm_remote = last_modified if last_modified else self.get_last_modified(path)
         if not lm_local or lm_local < lm_remote:
             if self.__download__(path, local_path, max_concurrency=max_concurrency):
-                self.__save_last_modified__(lm_remote, local_path)
+                Core.save_last_modified(lm_remote, local_path)
             else:
                 return None
         return local_path
