@@ -57,6 +57,18 @@ def __parse_vw_output__(txt):
     success = loss is not None
     return {'loss_per_example': average_loss, 'since_last': since_last, 'metrics': metrics, 'loss': loss}, success
 
+def __metrics_table__(metrics, name):
+    return pd.DataFrame([{'file': metrics['metrics']['Reading datafile'], 'n': int(k), name: float(metrics[name][k])}
+                         for k in metrics[name]]).set_index(['file', 'n'])
+
+def metrics_table(metrics):
+    return pd.concat([__metrics_table__(m, 'loss_per_example').join(__metrics_table__(m, 'since_last'))
+                      for m in metrics])
+
+def final_metrics_table(metrics):
+    return [m['metrics'] for m in metrics]
+
+
 def __save__(txt, path):
     with open(path, 'w') as f:
         f.write(txt)
@@ -186,7 +198,7 @@ class Vw:
             result = zip(opts_in, self.__train_on_dict__(inputs, opts_in, opts_out, input_mode))
             result_pd = []
             for r in result:
-                results = {'!Loss': r[1].Loss, '!Populated': r[1].Populated, '!Metrics': r[1].Metrics}
+                results = {'!Loss': r[1].Loss, '!Populated': r[1].Populated, '!Metrics': metrics_table(r[1].Metrics), '!FinalMetrics': final_metrics_table(r[1].Metrics)}
                 result_pd.append(dict(r[0], **results))
             return pd.DataFrame(result_pd)
         else:
@@ -198,7 +210,7 @@ class Vw:
             result = zip(opts_in, self.__test_on_dict__(inputs, opts_in, opts_out, input_mode))
             result_pd = []
             for r in result:
-                results = {'!Loss': r[1].Loss, '!Populated': r[1].Populated, '!Metrics': r[1].Metrics}
+                results = {'!Loss': r[1].Loss, '!Populated': r[1].Populated, '!Metrics': metrics_table(r[1].Metrics), '!FinalMetrics': final_metrics_table(r[1].Metrics)}
                 result_pd.append(dict(r[0], **results))
             return pd.DataFrame(result_pd)
         else:
