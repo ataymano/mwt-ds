@@ -58,12 +58,12 @@ def __parse_vw_output__(txt):
     return {'loss_per_example': average_loss, 'since_last': since_last, 'metrics': metrics, 'loss': loss}, success
 
 def __metrics_table__(metrics, name):
-    return pd.DataFrame([{'file': metrics['metrics']['Reading datafile'], 'n': int(k), name: float(metrics[name][k])}
-                         for k in metrics[name]]).set_index(['file', 'n'])
+    return pd.DataFrame([{'n': int(k), name: float(metrics[name][k])}
+                         for k in metrics[name]]).set_index('n')
 
 def metrics_table(metrics):
-    return pd.concat([__metrics_table__(m, 'loss_per_example').join(__metrics_table__(m, 'since_last'))
-                      for m in metrics])
+    return pd.concat([__metrics_table__(m, 'loss_per_example').join(__metrics_table__(m, 'since_last')).assign(file=i)
+                      for i, m in enumerate(metrics)]).reset_index().set_index(['file', 'n'])
 
 def final_metrics_table(metrics):
     return [m['metrics'] for m in metrics]
