@@ -180,7 +180,6 @@ class Vw:
             inputs = [inputs]
         return self.test(inputs, {'#cmd': VwOpts.to_cache_cmd(opts)}, ['--cache_file'])
 
-
     def train(self, inputs, opts_in, opts_out=[], input_mode=VwInput.raw):
         if isinstance(opts_in, pd.DataFrame):
             opts_in = list(opts_in.loc[:, ~opts_in.columns.str.startswith('!')].to_dict('index').values())
@@ -193,7 +192,7 @@ class Vw:
         else:
             return self.__train_on_dict__(inputs, opts_in, opts_out, input_mode)
 
-    def test_pd(self, inputs, opts_in, opts_out=[], input_mode=VwInput.raw):
+    def test(self, inputs, opts_in, opts_out=[], input_mode=VwInput.raw):
         if isinstance(opts_in, pd.DataFrame):
             opts_in = list(opts_in.loc[:, ~opts_in.columns.str.startswith('!')].to_dict('index').values())
             result = zip(opts_in, self.__test_on_dict__(inputs, opts_in, opts_out, input_mode))
