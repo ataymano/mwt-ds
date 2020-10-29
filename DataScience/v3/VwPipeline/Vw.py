@@ -93,13 +93,14 @@ class VwResult:
         self.Metrics = metrics
 
 class Vw:
-    def __init__(self, path, cache, procs=multiprocessing.cpu_count(), reset=False, norun=False):
+    def __init__(self, path, cache, procs=multiprocessing.cpu_count(), reset=False, norun=False, dedup_on_size = False):
         self.Path = path
         self.Cache = cache
         self.Logger = self.Cache.Logger
         self.Pool = SeqPool() if procs == 1 else MultiThreadPool(procs)
         self.Reset = reset
         self.NoRun = norun
+        self.DedupOnSize = dedup_on_size
 
     def __generate_command_line__(self, opts):
         return f'{self.Path} {VwOpts.to_string(opts)}'
@@ -117,9 +118,12 @@ class Vw:
         error = process.communicate()[1]
         return error
 
-    def run(self, opts_in: dict, opts_out: list):
-        populated = {o: self.Cache.get_path(opts_in, o) for o in opts_out}
-        metrics_path = self.Cache.get_path(opts_in)
+    def __get_salt__(self, path):
+        return str(os.stat(path).st_size) if self.DedupOnSize else None
+
+    def run(self, opts_in: dict, opts_out: list, salt = None):
+        populated = {o: self.Cache.get_path(opts_in, o, salt) for o in opts_out}
+        metrics_path = self.Cache.get_path(opts_in, salt)
 
         result_files = list(populated.values()) + [metrics_path]
         not_exist = next((p for p in result_files if not os.path.exists(p)), None)
@@ -151,7 +155,8 @@ class Vw:
         for index, inp in enumerate(inputs):
             Logger.info(self.Logger, f'Vw.Test: {inp}, opts_in: {json.dumps(opts_in)}, opts_out: {json.dumps(opts_out)}')
             current_opts = input_mode(opts_in, inp)
-            result, populated = self.run(current_opts, opts_out)
+            salt = self.__get_salt__(inp)
+            result, populated = self.run(current_opts, opts_out, salt)
             opts_populated[index] = populated
             metrics[index] = result
         return VwResult(result['loss'], opts_populated, metrics)
@@ -172,9 +177,10 @@ class Vw:
         for index, inp in enumerate(inputs):
             Logger.info(self.Logger, f'Vw.Train: {inp}, opts_in: {json.dumps(opts_in)}, opts_out: {json.dumps(opts_out)}')
             current_opts = input_mode(opts_in, inp)
+            salt = self.__get_salt__(inp)
             if index > 0:
                 current_opts['-i'] = opts_populated[index - 1]['-f']
-            result, populated = self.run(current_opts, opts_out)
+            result, populated = self.run(current_opts, opts_out, salt)
             opts_populated[index] = populated
             metrics[index] = result
         return VwResult(result['loss'], opts_populated, metrics)     
